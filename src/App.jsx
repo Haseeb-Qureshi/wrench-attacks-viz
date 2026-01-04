@@ -84,13 +84,6 @@ export default function BitcoinAttacksApp() {
     severeOrWorse: Math.round(((row.s4 + row.s5) / row.total) * 100),
   }));
   
-  // Calculate cumulative data
-  let cumS1 = 0, cumS2 = 0, cumS3 = 0, cumS4 = 0, cumS5 = 0;
-  const cumulativeData = yearlyData.map(item => {
-    cumS1 += item.s1; cumS2 += item.s2; cumS3 += item.s3; cumS4 += item.s4; cumS5 += item.s5;
-    return { year: item.year, s1: cumS1, s2: cumS2, s3: cumS3, s4: cumS4, s5: cumS5, total: cumS1 + cumS2 + cumS3 + cumS4 + cumS5 };
-  });
-  
   // Pie chart data
   const pieData = Object.entries(severityCounts).map(([severity, count]) => ({
     name: SEVERITY_LEVELS[severity].label,
@@ -250,8 +243,8 @@ export default function BitcoinAttacksApp() {
           <h3 className="text-sm font-semibold mb-3 text-gray-300">Severity Classification</h3>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
             {[1, 2, 3, 4, 5].map(sev => (
-              <div key={sev} className="flex items-start gap-2">
-                <div className="w-3 h-3 rounded mt-0.5 flex-shrink-0" style={{ backgroundColor: SEVERITY_LEVELS[sev].color }}></div>
+              <div key={sev} className="flex gap-2">
+                <div className="w-3 h-3 rounded mt-1 flex-shrink-0" style={{ backgroundColor: SEVERITY_LEVELS[sev].color }}></div>
                 <div>
                   <span className="text-sm font-medium" style={{ color: SEVERITY_LEVELS[sev].color }}>
                     {SEVERITY_LEVELS[sev].label}
@@ -311,7 +304,7 @@ export default function BitcoinAttacksApp() {
           <>
             {/* View Selector */}
             <div className="flex flex-wrap justify-center gap-2 mb-6">
-              {['stacked', 'cumulative', 'distribution'].map(view => (
+              {['stacked', 'distribution'].map(view => (
                 <button
                   key={view}
                   onClick={() => setChartView(view)}
@@ -341,25 +334,6 @@ export default function BitcoinAttacksApp() {
                       <Bar dataKey="s4" stackId="a" fill={SEVERITY_LEVELS[4].color} name="Severe" />
                       <Bar dataKey="s5" stackId="a" fill={SEVERITY_LEVELS[5].color} name="Fatal" radius={[4, 4, 0, 0]} />
                     </BarChart>
-                  </ResponsiveContainer>
-                </>
-              )}
-              
-              {chartView === 'cumulative' && (
-                <>
-                  <h2 className="text-lg md:text-xl font-semibold mb-4 text-center">Cumulative Attacks by Severity</h2>
-                  <ResponsiveContainer width="100%" height={400}>
-                    <AreaChart data={cumulativeData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                      <XAxis dataKey="year" stroke="#9CA3AF" />
-                      <YAxis stroke="#9CA3AF" />
-                      <Tooltip content={<SeverityTooltip />} />
-                      <Area type="monotone" dataKey="s1" stackId="1" stroke={SEVERITY_LEVELS[1].color} fill={SEVERITY_LEVELS[1].color} fillOpacity={0.8} />
-                      <Area type="monotone" dataKey="s2" stackId="1" stroke={SEVERITY_LEVELS[2].color} fill={SEVERITY_LEVELS[2].color} fillOpacity={0.8} />
-                      <Area type="monotone" dataKey="s3" stackId="1" stroke={SEVERITY_LEVELS[3].color} fill={SEVERITY_LEVELS[3].color} fillOpacity={0.8} />
-                      <Area type="monotone" dataKey="s4" stackId="1" stroke={SEVERITY_LEVELS[4].color} fill={SEVERITY_LEVELS[4].color} fillOpacity={0.8} />
-                      <Area type="monotone" dataKey="s5" stackId="1" stroke={SEVERITY_LEVELS[5].color} fill={SEVERITY_LEVELS[5].color} fillOpacity={0.8} />
-                    </AreaChart>
                   </ResponsiveContainer>
                 </>
               )}
