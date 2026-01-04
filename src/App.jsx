@@ -244,7 +244,7 @@ export default function BitcoinAttacksApp() {
           <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
             {[1, 2, 3, 4, 5].map(sev => (
               <div key={sev} className="flex gap-2">
-                <div className="w-3 h-3 rounded mt-1 flex-shrink-0" style={{ backgroundColor: SEVERITY_LEVELS[sev].color }}></div>
+                <div className="w-3 h-3 rounded mt-[5px] flex-shrink-0" style={{ backgroundColor: SEVERITY_LEVELS[sev].color }}></div>
                 <div>
                   <span className="text-sm font-medium" style={{ color: SEVERITY_LEVELS[sev].color }}>
                     {SEVERITY_LEVELS[sev].label}
@@ -439,26 +439,26 @@ export default function BitcoinAttacksApp() {
         {/* ============================================================ */}
         {activeChart === 'marketcap' && (
           <>
-            {/* Sample Size Note */}
-            <div className="bg-gray-700 rounded-lg p-3 mb-6 text-center">
-              <span className="text-gray-300 text-sm">
-                Monthly analysis: <span className="text-orange-400 font-bold">{marketCapCorrelation.totalMonths}</span> data points
-              </span>
-            </div>
-
-            {/* Regression Result */}
-            <div className="bg-gray-800 rounded-lg p-4 mb-6">
-              <h3 className="text-sm font-semibold text-gray-400 mb-2">Market Cap → Monthly Attack Count</h3>
-              <div className="flex items-baseline gap-3">
-                <span className="text-3xl font-bold text-orange-400">
-                  r = {marketCapCorrelation.mcRegression.correlation.toFixed(3)}
-                </span>
-                <span className="text-xl text-blue-400">
-                  R² = {(marketCapCorrelation.mcRegression.rSquared * 100).toFixed(1)}%
-                </span>
+            {/* Correlation Summary */}
+            <div className="bg-gray-800 rounded-xl p-6 mb-6">
+              <div className="text-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-300 mb-1">Market Cap → Attack Frequency</h3>
+                <p className="text-sm text-gray-500">{marketCapCorrelation.totalMonths} months of data (2014–2025)</p>
               </div>
-              <p className="text-xs text-gray-500 mt-2">
-                {marketCapCorrelation.mcRegression.rSquared > 0.3 ? 'Moderate' : 'Weak'} correlation between market cap and monthly attacks
+              <div className="flex justify-center items-center gap-8">
+                <div className="text-center">
+                  <div className="text-4xl font-bold text-orange-400">{marketCapCorrelation.mcRegression.correlation.toFixed(2)}</div>
+                  <div className="text-sm text-gray-500 mt-1">correlation (r)</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-4xl font-bold text-blue-400">{(marketCapCorrelation.mcRegression.rSquared * 100).toFixed(0)}%</div>
+                  <div className="text-sm text-gray-500 mt-1">variance explained (R²)</div>
+                </div>
+              </div>
+              <p className="text-center text-gray-400 text-sm mt-4">
+                {marketCapCorrelation.mcRegression.rSquared > 0.3
+                  ? 'Moderate positive correlation — attack frequency scales with crypto market cap'
+                  : 'Weak positive correlation — market cap is one factor among many'}
               </p>
             </div>
 
@@ -530,22 +530,6 @@ export default function BitcoinAttacksApp() {
                   <Scatter dataKey="attacks" fill="#f97316" name="Month" />
                 </ComposedChart>
               </ResponsiveContainer>
-            </div>
-
-            {/* Analysis Summary */}
-            <div className="bg-gray-800 rounded-xl p-4 md:p-6 mb-6">
-              <h2 className="text-lg md:text-xl font-semibold mb-4">Summary</h2>
-              <div className="space-y-4 text-sm">
-                <div className="border-l-4 border-orange-500 pl-4">
-                  <p className="text-gray-400">
-                    {`Market cap explains ${(marketCapCorrelation.mcRegression.rSquared * 100).toFixed(0)}% of monthly attack count variance (r = ${marketCapCorrelation.mcRegression.correlation.toFixed(2)}). `}
-                    {marketCapCorrelation.mcRegression.rSquared > 0.3
-                      ? `This moderate correlation suggests attack frequency scales with total crypto wealth.`
-                      : `This weak-to-moderate correlation suggests other factors beyond market cap influence attack frequency.`
-                    }
-                  </p>
-                </div>
-              </div>
             </div>
 
             {/* Denominator Analysis */}
