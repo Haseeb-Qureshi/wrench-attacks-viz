@@ -71,18 +71,20 @@ export default function BitcoinAttacksApp() {
   const stats = getStatistics();
   const { severityCounts, yearlyData } = stats;
   
-  // Calculate percentage data
-  const percentageData = yearlyData.map(row => ({
-    year: row.year,
-    total: row.total,
-    p1: Math.round((row.s1 / row.total) * 100),
-    p2: Math.round((row.s2 / row.total) * 100),
-    p3: Math.round((row.s3 / row.total) * 100),
-    p4: Math.round((row.s4 / row.total) * 100),
-    p5: Math.round((row.s5 / row.total) * 100),
-    c1: row.s1, c2: row.s2, c3: row.s3, c4: row.s4, c5: row.s5,
-    severeOrWorse: Math.round(((row.s4 + row.s5) / row.total) * 100),
-  }));
+  // Calculate percentage data (ensure they sum to exactly 100)
+  const percentageData = yearlyData.map(row => {
+    const p1 = Math.round((row.s1 / row.total) * 100);
+    const p2 = Math.round((row.s2 / row.total) * 100);
+    const p3 = Math.round((row.s3 / row.total) * 100);
+    const p4 = Math.round((row.s4 / row.total) * 100);
+    const p5 = 100 - p1 - p2 - p3 - p4; // Ensure exact 100% total
+    return {
+      year: row.year,
+      total: row.total,
+      p1, p2, p3, p4, p5,
+      c1: row.s1, c2: row.s2, c3: row.s3, c4: row.s4, c5: row.s5,
+    };
+  });
   
   // Pie chart data
   const pieData = Object.entries(severityCounts).map(([severity, count]) => ({
