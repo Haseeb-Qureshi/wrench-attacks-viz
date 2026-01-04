@@ -45,6 +45,103 @@ export const SEVERITY_LEVELS = {
   }
 };
 
+// Geographic regions for analysis
+export const REGIONS = {
+  'North America': { color: '#3b82f6', label: 'North America' },      // blue
+  'Western Europe': { color: '#8b5cf6', label: 'Western Europe' },    // purple
+  'Eastern Europe': { color: '#ec4899', label: 'Eastern Europe' },    // pink
+  'Asia-Pacific': { color: '#14b8a6', label: 'Asia-Pacific' },        // teal
+  'South Asia': { color: '#f59e0b', label: 'South Asia' },            // amber
+  'Latin America': { color: '#10b981', label: 'Latin America' },      // emerald
+  'Middle East': { color: '#ef4444', label: 'Middle East' },          // red
+  'Africa': { color: '#6366f1', label: 'Africa' },                    // indigo
+};
+
+// Map locations to regions
+const regionPatterns = {
+  'North America': ['United States', 'Canada'],
+  'Western Europe': ['England', 'Netherlands', 'France', 'Germany', 'Austria', 'Italy', 'Spain', 'Belgium', 'Switzerland', 'Ireland', 'Norway', 'Sweden', 'Denmark', 'Finland', 'Iceland', 'Portugal', 'Scotland', 'Wales', 'UK', 'Malta', 'Greece', 'Cyprus'],
+  'Eastern Europe': ['Russia', 'Ukraine', 'Lithuania', 'Poland', 'Czech Republic', 'Romania', 'Bulgaria', 'Hungary', 'Slovakia', 'Belarus', 'Moldova', 'Latvia', 'Estonia', 'Georgia', 'Montenegro', 'Abkhazia'],
+  'Latin America': ['Brazil', 'Mexico', 'Argentina', 'Colombia', 'Venezuela', 'Chile', 'Peru', 'Ecuador', 'Costa Rica', 'Panama', 'Dominican Republic', 'Puerto Rico', 'Honduras', 'El Salvador', 'Guatemala', 'Trinidad', 'Paraguay'],
+  'Asia-Pacific': ['China', 'Japan', 'South Korea', 'Taiwan', 'Hong Kong', 'Singapore', 'Thailand', 'Vietnam', 'Philippines', 'Malaysia', 'Indonesia', 'Australia', 'New Zealand'],
+  'South Asia': ['India', 'Pakistan', 'Bangladesh', 'Sri Lanka', 'Nepal'],
+  'Middle East': ['UAE', 'Turkey', 'Israel', 'Saudi Arabia', 'Lebanon', 'Jordan', 'Iran', 'Dubai'],
+  'Africa': ['South Africa', 'Nigeria', 'Kenya', 'Ghana', 'Egypt', 'Morocco', 'Uganda', 'Lagos'],
+};
+
+export const getRegion = (location) => {
+  for (const [region, patterns] of Object.entries(regionPatterns)) {
+    if (patterns.some(pattern => location.includes(pattern))) {
+      return region;
+    }
+  }
+  return 'Unknown';
+};
+
+// City coordinates for map visualization (approximate)
+export const cityCoordinates = {
+  // North America
+  'Santa Barbara, California': [-119.7, 34.4],
+  'Atlanta, Georgia': [-84.4, 33.7],
+  'New York, New York': [-74.0, 40.7],
+  'Los Angeles, California': [-118.2, 34.1],
+  'Miami, Florida': [-80.2, 25.8],
+  'Durham, North Carolina': [-78.9, 36.0],
+  'Milwaukee, Wisconsin': [-87.9, 43.0],
+  'Cumming, Georgia': [-84.1, 34.2],
+  'West Palm Beach, Florida': [-80.1, 26.7],
+  'Ottawa, Canada': [-75.7, 45.4],
+  'Toronto, Ontario, Canada': [-79.4, 43.7],
+  // Western Europe
+  'Amsterdam, Netherlands': [4.9, 52.4],
+  'London, England': [-0.1, 51.5],
+  'Paris, France': [2.4, 48.9],
+  'Toulouse, France': [1.4, 43.6],
+  'Milan, Italy': [9.2, 45.5],
+  'Wels, Austria': [14.0, 48.2],
+  'Oslo, Norway': [10.8, 59.9],
+  'Reykjavik, Iceland': [-22.0, 64.1],
+  'Manchester, England': [-2.2, 53.5],
+  'Delft, Netherlands': [4.4, 52.0],
+  'Drouwenerveen, Netherlands': [6.8, 52.9],
+  // Eastern Europe
+  'Kyiv, Ukraine': [30.5, 50.5],
+  'Moscow, Russia': [37.6, 55.8],
+  'Kaunas, Lithuania': [23.9, 54.9],
+  'Odessa, Ukraine': [30.7, 46.5],
+  // Asia-Pacific
+  'Hong Kong': [114.2, 22.3],
+  'Singapore': [103.8, 1.4],
+  'Tokyo, Japan': [139.7, 35.7],
+  'Phuket, Thailand': [98.4, 7.9],
+  'Sydney, Australia': [151.2, -33.9],
+  // South Asia
+  'Mumbai, India': [72.9, 19.1],
+  'Delhi, India': [77.2, 28.6],
+  // Latin America
+  'Sao Paulo, Brazil': [-46.6, -23.6],
+  'Florianopolis, Brazil': [-48.5, -27.6],
+  'Buenos Aires, Argentina': [-58.4, -34.6],
+  // Middle East
+  'Dubai, UAE': [55.3, 25.3],
+  'Istanbul, Turkey': [29.0, 41.0],
+  // Africa
+  'Johannesburg, South Africa': [28.0, -26.2],
+  'Cape Town, South Africa': [18.4, -33.9],
+};
+
+// Helper to get coordinates for a location
+export const getCoordinates = (location) => {
+  // Try exact match first
+  for (const [city, coords] of Object.entries(cityCoordinates)) {
+    if (location.includes(city.split(',')[0])) {
+      return coords;
+    }
+  }
+  // Return null if not found
+  return null;
+};
+
 export const attacks = [
   { date: "2014-12-29", severity: 1, location: "Santa Barbara, California, United States", victim: "Hal Finney", type: "swatting", description: "Bitcoin developer SWATted after months of harassment & extortion" },
   { date: "2015-01-03", severity: 3, location: "Atlanta, Georgia, United States", victim: "Amanda McCollum", type: "armed_robbery", description: "BTM thieves strike smoke shop, fire gun" },

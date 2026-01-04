@@ -1,7 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, ComposedChart, Scatter } from 'recharts';
-import { SEVERITY_LEVELS, attacks } from './data';
+import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
+import { SEVERITY_LEVELS, attacks, REGIONS, getRegion } from './data';
 import { getMonthlyMarketCap, coinbaseUsers, getYearlyMarketCap } from './marketCapData';
+
+const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -67,6 +70,7 @@ export default function BitcoinAttacksApp() {
   const [activeChart, setActiveChart] = useState('severity');
   const [chartView, setChartView] = useState('stacked');
   const [selectedYear, setSelectedYear] = useState(null);
+  const [hoveredMarker, setHoveredMarker] = useState(null);
   
   const stats = getStatistics();
   const { severityCounts, yearlyData } = stats;
@@ -168,6 +172,144 @@ export default function BitcoinAttacksApp() {
     return combined;
   }, []);
 
+  // Geographic analysis data
+  const geoAnalysis = useMemo(() => {
+    const regionOrder = ['North America', 'Western Europe', 'Eastern Europe', 'Asia-Pacific', 'South Asia', 'Latin America', 'Middle East', 'Africa'];
+
+    // Overall counts by region
+    const byRegion = {};
+    const byRegionYear = {};
+    const attacksWithCoords = [];
+
+    attacks.forEach(attack => {
+      const region = getRegion(attack.location);
+      const year = attack.date.substring(0, 4);
+
+      byRegion[region] = (byRegion[region] || 0) + 1;
+
+      if (!byRegionYear[year]) {
+        byRegionYear[year] = {};
+        regionOrder.forEach(r => byRegionYear[year][r] = 0);
+      }
+      byRegionYear[year][region] = (byRegionYear[year][region] || 0) + 1;
+
+      // Collect attack data for map markers
+      attacksWithCoords.push({
+        ...attack,
+        region,
+        year,
+      });
+    });
+
+    // Pie chart data
+    const pieData = regionOrder
+      .filter(r => byRegion[r] > 0)
+      .map(region => ({
+        name: region,
+        value: byRegion[region] || 0,
+        color: REGIONS[region]?.color || '#666',
+      }));
+
+    // Yearly percentage data for stacked bar chart (ensure exact 100% total)
+    const yearlyData = Object.keys(byRegionYear).sort().map(year => {
+      const total = Object.values(byRegionYear[year]).reduce((a, b) => a + b, 0);
+      const row = { year, total };
+
+      if (total === 0) {
+        regionOrder.forEach(region => {
+          row[region] = 0;
+          row[`${region}Pct`] = 0;
+        });
+        return row;
+      }
+
+      // First pass: calculate raw percentages and store counts
+      const rawPcts = [];
+      regionOrder.forEach(region => {
+        const count = byRegionYear[year][region] || 0;
+        row[region] = count;
+        const rawPct = (count / total) * 100;
+        const roundedPct = Math.round(rawPct);
+        rawPcts.push({ region, count, rawPct, roundedPct, error: rawPct - roundedPct });
+      });
+
+      // Calculate sum of rounded percentages
+      const sumRounded = rawPcts.reduce((sum, r) => sum + r.roundedPct, 0);
+      const diff = 100 - sumRounded;
+
+      // Distribute the difference to regions with the largest rounding errors
+      // Sort by error (descending for positive diff, ascending for negative diff)
+      const sortedByError = [...rawPcts].filter(r => r.count > 0).sort((a, b) =>
+        diff > 0 ? b.error - a.error : a.error - b.error
+      );
+
+      // Apply adjustments
+      const adjustments = new Map();
+      for (let i = 0; i < Math.abs(diff) && i < sortedByError.length; i++) {
+        adjustments.set(sortedByError[i].region, diff > 0 ? 1 : -1);
+      }
+
+      // Set final percentages
+      rawPcts.forEach(({ region, roundedPct }) => {
+        const adjustment = adjustments.get(region) || 0;
+        row[`${region}Pct`] = Math.max(0, roundedPct + adjustment);
+      });
+
+      return row;
+    });
+
+    // Severity stats by region
+    const severityByRegion = {};
+    attacks.forEach(attack => {
+      const region = getRegion(attack.location);
+      if (!severityByRegion[region]) {
+        severityByRegion[region] = { total: 0, severe: 0, fatal: 0, sumSeverity: 0 };
+      }
+      severityByRegion[region].total++;
+      severityByRegion[region].sumSeverity += attack.severity;
+      if (attack.severity >= 4) severityByRegion[region].severe++;
+      if (attack.severity === 5) severityByRegion[region].fatal++;
+    });
+
+    // Map markers - aggregate by approximate city location
+    const cityAggregates = {};
+    attacksWithCoords.forEach(attack => {
+      // Create a simplified city key from location
+      const parts = attack.location.split(',');
+      const city = parts[0].trim();
+      const country = parts[parts.length - 1].trim();
+      const key = `${city}, ${country}`;
+
+      if (!cityAggregates[key]) {
+        cityAggregates[key] = {
+          city,
+          country,
+          location: attack.location,
+          attacks: [],
+          totalSeverity: 0,
+          count: 0,
+          region: attack.region,
+        };
+      }
+      cityAggregates[key].attacks.push(attack);
+      cityAggregates[key].totalSeverity += attack.severity;
+      cityAggregates[key].count++;
+    });
+
+    const mapMarkers = Object.values(cityAggregates).map(city => ({
+      ...city,
+      avgSeverity: city.totalSeverity / city.count,
+    }));
+
+    return {
+      pieData,
+      yearlyData,
+      severityByRegion,
+      mapMarkers,
+      regionOrder,
+    };
+  }, []);
+
   // Custom tooltips
   const SeverityTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -263,6 +405,14 @@ export default function BitcoinAttacksApp() {
             }`}
           >
             Market Cap Analysis
+          </button>
+          <button
+            onClick={() => setActiveChart('geographic')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeChart === 'geographic' ? 'bg-orange-500 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+          >
+            Geographic Analysis
           </button>
         </div>
         
@@ -600,7 +750,437 @@ export default function BitcoinAttacksApp() {
             </div>
           </>
         )}
-        
+
+        {/* ============================================================ */}
+        {/* CHART 4: GEOGRAPHIC ANALYSIS */}
+        {/* ============================================================ */}
+        {activeChart === 'geographic' && (
+          <>
+            {/* Region Pie Chart */}
+            <div className="bg-gray-800 rounded-xl p-4 md:p-6 mb-6 overflow-visible">
+              <h2 className="text-lg md:text-xl font-semibold mb-2 text-center">Attacks by Region</h2>
+              <p className="text-center text-gray-400 text-sm mb-4">Distribution of all {attacks.length} documented attacks</p>
+              <div className="flex flex-col lg:flex-row items-center justify-center gap-8">
+                <div style={{ width: 400, height: 350 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                      <Pie
+                        data={geoAnalysis.pieData}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={90}
+                        dataKey="value"
+                        label={({ name, percent, cx, cy, midAngle, outerRadius }) => {
+                          const RADIAN = Math.PI / 180;
+                          const radius = outerRadius + 25;
+                          const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                          const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                          return (
+                            <text
+                              x={x}
+                              y={y}
+                              fill="#9CA3AF"
+                              textAnchor={x > cx ? 'start' : 'end'}
+                              dominantBaseline="central"
+                              fontSize={12}
+                            >
+                              {`${name.split(' ')[0]} ${(percent * 100).toFixed(0)}%`}
+                            </text>
+                          );
+                        }}
+                        labelLine={{ stroke: '#6B7280', strokeWidth: 1 }}
+                      >
+                        {geoAnalysis.pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px', color: '#fff' }}
+                        itemStyle={{ color: '#fff' }}
+                        formatter={(value, name) => [`${value} attacks`, name]}
+                        wrapperStyle={{ zIndex: 100 }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {geoAnalysis.pieData.map(region => (
+                    <div key={region.name} className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded" style={{ backgroundColor: region.color }}></div>
+                      <span className="text-sm text-gray-300">{region.name}: <span className="text-white font-medium">{region.value}</span></span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Region Stacked Bar Chart Over Time */}
+            <div className="bg-gray-800 rounded-xl p-4 md:p-6 mb-6">
+              <h2 className="text-lg md:text-xl font-semibold mb-2 text-center">Regional Distribution by Year (%)</h2>
+              <p className="text-center text-gray-400 text-sm mb-4">Each bar = 100% of attacks for that year</p>
+              <div className="relative">
+                <ResponsiveContainer width="100%" height={400}>
+                  <BarChart data={geoAnalysis.yearlyData} margin={{ top: 5, right: 160, bottom: 5, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis dataKey="year" stroke="#9CA3AF" />
+                    <YAxis stroke="#9CA3AF" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px', color: '#fff' }}
+                      formatter={(value, name, props) => {
+                        const data = props.payload;
+                        const count = data[name];
+                        return [`${count} attacks (${value}%)`, name];
+                      }}
+                    />
+                    {geoAnalysis.regionOrder.map((region) => (
+                      <Bar
+                        key={region}
+                        dataKey={`${region}Pct`}
+                        stackId="a"
+                        fill={REGIONS[region]?.color || '#666'}
+                        name={region}
+                      />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+                {/* Right-side legend positioned absolutely to align with chart area */}
+                <div
+                  className="hidden md:block absolute"
+                  style={{
+                    right: '10px',
+                    top: '10px',
+                    bottom: '35px',
+                    width: '150px',
+                  }}
+                >
+                  {(() => {
+                    const lastYear = geoAnalysis.yearlyData[geoAnalysis.yearlyData.length - 1];
+                    if (!lastYear) return null;
+
+                    // Calculate cumulative positions for each region (bottom to top)
+                    let cumulative = 0;
+                    const segments = geoAnalysis.regionOrder.map(region => {
+                      const pct = lastYear[`${region}Pct`] || 0;
+                      const startPct = cumulative;
+                      cumulative += pct;
+                      const midPct = startPct + pct / 2;
+                      return {
+                        region,
+                        pct,
+                        midPct,
+                        color: REGIONS[region]?.color || '#666',
+                      };
+                    }).filter(s => s.pct > 0);
+
+                    return segments.map((seg) => {
+                      // Apply a vertical offset that increases toward the top (5px at top, ~1px at bottom)
+                      const verticalOffset = 1 + (seg.midPct / 100) * 4;
+                      return (
+                      <div
+                        key={seg.region}
+                        className="absolute flex items-center text-xs"
+                        style={{
+                          bottom: `calc(${seg.midPct}% + ${verticalOffset}px)`,
+                          transform: 'translateY(50%)',
+                          left: 0,
+                          right: 0,
+                        }}
+                      >
+                        <div className="flex items-center gap-1">
+                          <span className="text-gray-600">◀</span>
+                          <span style={{ color: seg.color }} className="font-medium">
+                            {seg.region}
+                          </span>
+                          <span className="text-gray-500">{seg.pct}%</span>
+                        </div>
+                      </div>
+                    )});
+                  })()}
+                </div>
+              </div>
+              {/* Mobile legend */}
+              <div className="md:hidden flex flex-wrap justify-center gap-3 mt-4">
+                {geoAnalysis.regionOrder.map(region => (
+                  <div key={region} className="flex items-center gap-1">
+                    <div className="w-3 h-3 rounded" style={{ backgroundColor: REGIONS[region]?.color }}></div>
+                    <span className="text-xs text-gray-400">{region}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Danger by Region Table */}
+            <div className="bg-gray-800 rounded-xl p-4 md:p-6 mb-6">
+              <h2 className="text-lg md:text-xl font-semibold mb-4 text-center">Severity by Region</h2>
+              <p className="text-center text-gray-400 text-sm mb-4">Where are attacks most dangerous?</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-700">
+                      <th className="text-left py-2 px-3">Region</th>
+                      <th className="text-right py-2 px-3">Attacks</th>
+                      <th className="text-right py-2 px-3">Avg Severity</th>
+                      <th className="text-right py-2 px-3">Severe+</th>
+                      <th className="text-right py-2 px-3">Fatal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {geoAnalysis.pieData
+                      .sort((a, b) => {
+                        const aFatal = (geoAnalysis.severityByRegion[a.name]?.fatal || 0) / (geoAnalysis.severityByRegion[a.name]?.total || 1);
+                        const bFatal = (geoAnalysis.severityByRegion[b.name]?.fatal || 0) / (geoAnalysis.severityByRegion[b.name]?.total || 1);
+                        return bFatal - aFatal;
+                      })
+                      .map(region => {
+                        const stats = geoAnalysis.severityByRegion[region.name] || { total: 0, severe: 0, fatal: 0, sumSeverity: 0 };
+                        const avgSev = stats.total > 0 ? (stats.sumSeverity / stats.total).toFixed(2) : '—';
+                        const severePct = stats.total > 0 ? `${Math.round((stats.severe / stats.total) * 100)}%` : '—';
+                        const fatalPct = stats.total > 0 ? `${Math.round((stats.fatal / stats.total) * 100)}%` : '—';
+                        const fatalRate = stats.total > 0 ? (stats.fatal / stats.total) : 0;
+                        return (
+                          <tr key={region.name} className="border-b border-gray-700">
+                            <td className="py-2 px-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded" style={{ backgroundColor: region.color }}></div>
+                                <span style={{ color: region.color }}>{region.name}</span>
+                              </div>
+                            </td>
+                            <td className="text-right py-2 px-3 text-gray-300">{stats.total}</td>
+                            <td className="text-right py-2 px-3 text-orange-400">{avgSev}</td>
+                            <td className="text-right py-2 px-3 text-red-400">{severePct}</td>
+                            <td className="text-right py-2 px-3 font-bold" style={{ color: fatalRate > 0.1 ? '#ef4444' : fatalRate > 0 ? '#f97316' : '#9ca3af' }}>{fatalPct}</td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-gray-500 mt-4 text-center">
+                Sorted by fatality rate. Latin America and Africa have significantly higher fatality rates.
+              </p>
+            </div>
+
+            {/* World Map */}
+            <div className="bg-gray-800 rounded-xl p-4 md:p-6 mb-6">
+              <h2 className="text-lg md:text-xl font-semibold mb-2 text-center">Global Attack Map</h2>
+              <p className="text-center text-gray-400 text-sm mb-4">Circle size = number of attacks, color = danger level (green = safer, red = more dangerous)</p>
+              <div className="w-full relative" style={{ height: '500px' }}>
+                {/* Map Tooltip */}
+                {hoveredMarker && (
+                  <div
+                    className="absolute z-50 bg-gray-900 border border-gray-600 rounded-lg p-3 pointer-events-none shadow-xl"
+                    style={{
+                      left: hoveredMarker.x,
+                      top: hoveredMarker.y,
+                      transform: 'translate(-50%, -100%) translateY(-10px)',
+                      minWidth: '200px'
+                    }}
+                  >
+                    <div className="font-semibold text-white mb-1">{hoveredMarker.city}, {hoveredMarker.country}</div>
+                    <div className="text-sm text-gray-300">
+                      <span className="text-orange-400 font-medium">{hoveredMarker.count}</span> attack{hoveredMarker.count > 1 ? 's' : ''}
+                    </div>
+                    <div className="text-sm text-gray-300">
+                      Avg severity: <span className="font-medium" style={{ color: hoveredMarker.dangerColor }}>{hoveredMarker.avgSeverity.toFixed(1)}</span>
+                    </div>
+                    {hoveredMarker.attacks && hoveredMarker.attacks.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-gray-700 text-xs text-gray-400 max-h-32 overflow-y-auto">
+                        {hoveredMarker.attacks.slice(0, 3).map((a, i) => (
+                          <div key={i} className="mb-1">
+                            <span className="text-gray-500">{a.date.substring(0, 4)}</span> {a.description.substring(0, 50)}{a.description.length > 50 ? '...' : ''}
+                          </div>
+                        ))}
+                        {hoveredMarker.attacks.length > 3 && (
+                          <div className="text-gray-500">+{hoveredMarker.attacks.length - 3} more</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <ComposableMap
+                  projection="geoMercator"
+                  projectionConfig={{
+                    scale: 130,
+                    center: [20, 20]
+                  }}
+                  style={{ width: '100%', height: '100%' }}
+                >
+                  <Geographies geography={geoUrl}>
+                    {({ geographies }) =>
+                      geographies.map((geo) => (
+                        <Geography
+                          key={geo.rsmKey}
+                          geography={geo}
+                          fill="#374151"
+                          stroke="#4B5563"
+                          strokeWidth={0.5}
+                          style={{
+                            default: { outline: 'none' },
+                            hover: { fill: '#4B5563', outline: 'none' },
+                            pressed: { outline: 'none' },
+                          }}
+                        />
+                      ))
+                    }
+                  </Geographies>
+                  {(() => {
+                    // Calculate danger scores for all markers
+                    const maxCount = Math.max(...geoAnalysis.mapMarkers.map(m => m.count));
+                    const maxSeverity = 5;
+
+                    return geoAnalysis.mapMarkers.map((marker, idx) => {
+                      // Get approximate coordinates for the city
+                      const coords = (() => {
+                        const loc = marker.location.toLowerCase();
+                        // Major city coordinate lookup
+                        const cityCoords = {
+                          // North America
+                          'new york': [-74.0, 40.7],
+                          'los angeles': [-118.2, 34.1],
+                          'miami': [-80.2, 25.8],
+                          'atlanta': [-84.4, 33.7],
+                          'chicago': [-87.6, 41.9],
+                          'san francisco': [-122.4, 37.8],
+                          'houston': [-95.4, 29.8],
+                          'dallas': [-96.8, 32.8],
+                          'toronto': [-79.4, 43.7],
+                          'ottawa': [-75.7, 45.4],
+                          // Western Europe
+                          'london': [-0.1, 51.5],
+                          'amsterdam': [4.9, 52.4],
+                          'paris': [2.4, 48.9],
+                          'berlin': [13.4, 52.5],
+                          'madrid': [-3.7, 40.4],
+                          'rome': [12.5, 41.9],
+                          'milan': [9.2, 45.5],
+                          'barcelona': [2.2, 41.4],
+                          'manchester': [-2.2, 53.5],
+                          'oslo': [10.8, 59.9],
+                          // Eastern Europe
+                          'moscow': [37.6, 55.8],
+                          'kyiv': [30.5, 50.5],
+                          'kiev': [30.5, 50.5],
+                          'st petersburg': [30.3, 59.9],
+                          'warsaw': [21.0, 52.2],
+                          // Asia-Pacific
+                          'hong kong': [114.2, 22.3],
+                          'singapore': [103.8, 1.4],
+                          'tokyo': [139.7, 35.7],
+                          'sydney': [151.2, -33.9],
+                          'melbourne': [145.0, -37.8],
+                          'bangkok': [100.5, 13.8],
+                          'shanghai': [121.5, 31.2],
+                          'beijing': [116.4, 39.9],
+                          // South Asia
+                          'mumbai': [72.9, 19.1],
+                          'delhi': [77.2, 28.6],
+                          'bangalore': [77.6, 13.0],
+                          // Latin America
+                          'sao paulo': [-46.6, -23.6],
+                          'rio': [-43.2, -22.9],
+                          'buenos aires': [-58.4, -34.6],
+                          'mexico city': [-99.1, 19.4],
+                          'bogota': [-74.1, 4.7],
+                          // Middle East
+                          'dubai': [55.3, 25.3],
+                          'istanbul': [29.0, 41.0],
+                          'tel aviv': [34.8, 32.1],
+                          // Africa
+                          'johannesburg': [28.0, -26.2],
+                          'cape town': [18.4, -33.9],
+                          'lagos': [3.4, 6.5],
+                          'nairobi': [36.8, -1.3],
+                        };
+                        for (const [city, coords] of Object.entries(cityCoords)) {
+                          if (loc.includes(city)) return coords;
+                        }
+                        // Fallback: use region center
+                        const regionCenters = {
+                          'North America': [-95, 40],
+                          'Western Europe': [10, 50],
+                          'Eastern Europe': [35, 52],
+                          'Asia-Pacific': [120, 25],
+                          'South Asia': [78, 22],
+                          'Latin America': [-60, -15],
+                          'Middle East': [45, 30],
+                          'Africa': [20, 0],
+                        };
+                        return regionCenters[marker.region] || [0, 0];
+                      })();
+
+                      // Calculate marker size based on attack count
+                      const size = Math.min(4 + marker.count * 3, 25);
+
+                      // Calculate danger score (0-1) based on count and severity
+                      // Higher count + higher severity = more dangerous
+                      const countFactor = Math.min(marker.count / 5, 1); // normalize: 5+ attacks = max
+                      const severityFactor = (marker.avgSeverity - 1) / (maxSeverity - 1); // 1-5 -> 0-1
+                      const dangerScore = (countFactor * 0.4 + severityFactor * 0.6); // weight severity more
+
+                      // Interpolate from green (#22c55e) through yellow (#eab308) to red (#ef4444)
+                      const getDangerColor = (score) => {
+                        if (score < 0.5) {
+                          // Green to Yellow (0 -> 0.5)
+                          const t = score * 2;
+                          const r = Math.round(34 + t * (234 - 34));
+                          const g = Math.round(197 + t * (179 - 197));
+                          const b = Math.round(94 + t * (8 - 94));
+                          return `rgb(${r}, ${g}, ${b})`;
+                        } else {
+                          // Yellow to Red (0.5 -> 1)
+                          const t = (score - 0.5) * 2;
+                          const r = Math.round(234 + t * (239 - 234));
+                          const g = Math.round(179 - t * 179);
+                          const b = Math.round(8 + t * (68 - 8));
+                          return `rgb(${r}, ${g}, ${b})`;
+                        }
+                      };
+
+                      const dangerColor = getDangerColor(dangerScore);
+
+                      return (
+                        <Marker key={idx} coordinates={coords}>
+                          <circle
+                            r={size}
+                            fill={dangerColor}
+                            fillOpacity={0.8}
+                            stroke="#fff"
+                            strokeWidth={0.5}
+                            style={{ cursor: 'pointer' }}
+                            onMouseEnter={(e) => {
+                              const rect = e.target.ownerSVGElement.getBoundingClientRect();
+                              const point = e.target.getBoundingClientRect();
+                              setHoveredMarker({
+                                ...marker,
+                                dangerColor,
+                                x: point.left - rect.left + point.width / 2,
+                                y: point.top - rect.top,
+                              });
+                            }}
+                            onMouseLeave={() => setHoveredMarker(null)}
+                          />
+                        </Marker>
+                      );
+                    });
+                  })()}
+                </ComposableMap>
+              </div>
+              <div className="flex justify-center gap-4 mt-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400">Danger:</span>
+                  <div className="flex items-center">
+                    <div className="w-20 h-3 rounded" style={{ background: 'linear-gradient(to right, #22c55e, #eab308, #ef4444)' }}></div>
+                  </div>
+                  <span className="text-xs text-gray-400">Low → High</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400">Size = attack count</span>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
         {/* Selected Year Details */}
         {selectedYear && selectedYearAttacks.length > 0 && (
           <div className="bg-gray-800 rounded-xl p-4 md:p-6 mb-6">
