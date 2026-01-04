@@ -242,7 +242,7 @@ export default function BitcoinAttacksApp() {
           Physical Bitcoin/Crypto Attacks Analysis
         </h1>
         <p className="text-center text-gray-400 mb-4 text-sm">
-          Data: github.com/jlopp/physical-bitcoin-attacks • {attacks.length} total attacks
+          Data: <a href="https://github.com/jlopp/physical-bitcoin-attacks" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">jlopp/physical-bitcoin-attacks</a> • {attacks.length} total attacks • <a href="https://github.com/Haseeb-Qureshi/wrench-attacks-viz" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">View source</a>
         </p>
         
         {/* Severity Legend with Descriptions */}
