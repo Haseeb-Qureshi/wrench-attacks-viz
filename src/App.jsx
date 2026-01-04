@@ -1,0 +1,739 @@
+import React, { useState } from 'react';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell } from 'recharts';
+
+// ============================================================================
+// SINGLE SOURCE OF TRUTH - ALL ATTACK DATA
+// Source: https://github.com/jlopp/physical-bitcoin-attacks
+// ============================================================================
+
+/**
+ * SEVERITY CLASSIFICATION:
+ * 
+ * 5 - FATAL: Victim was killed
+ * 4 - SEVERE: Kidnapping with torture, severed body parts, severe beatings, 
+ *             gunshot wounds, prolonged captivity with violence, permanent injury
+ * 3 - SERIOUS: Armed robbery at gunpoint/knifepoint, kidnapping without severe 
+ *              torture, home invasion with weapons, physical restraint
+ * 2 - MODERATE: Robbery with some violence/assault, drugging, extortion with 
+ *               threats, pepper spray, punching
+ * 1 - MINOR: Theft without confrontation, failed attempts, ATM/equipment theft, 
+ *            swatting without physical harm
+ */
+
+const SEVERITY_LEVELS = {
+  1: {
+    label: 'Minor',
+    description: 'Theft without confrontation, failed attempts, ATM/equipment theft',
+    color: '#22c55e' // green
+  },
+  2: {
+    label: 'Moderate', 
+    description: 'Robbery with some violence/assault, drugging, extortion',
+    color: '#eab308' // yellow
+  },
+  3: {
+    label: 'Serious',
+    description: 'Armed robbery, kidnapping, home invasion at gunpoint/knifepoint',
+    color: '#f97316' // orange
+  },
+  4: {
+    label: 'Severe',
+    description: 'Kidnapping with torture, severed body parts, severe beatings, gunshot wounds',
+    color: '#ef4444' // red
+  },
+  5: {
+    label: 'Fatal',
+    description: 'Victim was killed',
+    color: '#7c3aed' // purple
+  }
+};
+
+const attacks = [
+  { date: "2014-12-29", severity: 2, location: "Santa Barbara, California, United States", victim: "Hal Finney", type: "swatting", description: "Bitcoin developer SWATted after months of harassment & extortion" },
+  { date: "2015-01-03", severity: 3, location: "Atlanta, Georgia, United States", victim: "Amanda McCollum", type: "armed_robbery", description: "BTM thieves strike smoke shop, fire gun" },
+  { date: "2015-01-22", severity: 1, location: "Amsterdam, Netherlands", victim: "Martin Wismeijer", type: "theft", description: "Thieves steal 2 bitcoin ATMs" },
+  { date: "2015-02-01", severity: 3, location: "New York, New York, United States", victim: "Dean Katz", type: "armed_robbery", description: "Bitcoin trader robbed of $12,000 at gunpoint" },
+  { date: "2015-05-27", severity: 4, location: "New York, New York, United States", victim: "Dwayne Richards", type: "kidnapping", description: "Firefighter kidnapped, robbed of $1,100, & stabbed by crypto thieves" },
+  { date: "2015-11-16", severity: 1, location: "Delft, Netherlands", victim: "Robert Nederhoed", type: "theft", description: "Thieves steal bitcoin ATM containing 2,000 EUR" },
+  { date: "2016-07-11", severity: 3, location: "Kaunas, Lithuania", victim: "Tadas Kasputis", type: "kidnapping", description: "Cryptocurrency executive kidnapped at car wash" },
+  { date: "2016-07-25", severity: 3, location: "West Palm Beach, Florida, United States", victim: "Steve Manos", type: "armed_robbery", description: "Bitcoin trader robbed of $28,000 at gunpoint" },
+  { date: "2016-08-14", severity: 2, location: "Toronto, Ontario, Canada", victim: "Multiple", type: "robbery", description: "Police arrest teens in string of bitcoin-related robberies" },
+  { date: "2016-11-06", severity: 1, location: "Oudenbosch, Netherlands", victim: "Tivoli Brasserie", type: "theft", description: "Dutch Bitcoin ATM Owner Laughs at Thieves Who Took His Machine" },
+  { date: "2017-02-16", severity: 2, location: "London, England", victim: "Josoj", type: "robbery", description: "Robbery during Localbitcoins trade" },
+  { date: "2017-02-26", severity: 3, location: "Florianopolis, Brazil", victim: "Rocelo Lopes' wife", type: "kidnapping", description: "Wife of crypto exchange owner kidnapped and ransomed" },
+  { date: "2017-03-14", severity: 3, location: "Dubai, UAE", victim: "3 Indian Bitcoin traders", type: "kidnapping", description: "3 Emiratis pose as cops, kidnap victims and rob them of 25 BTC" },
+  { date: "2017-06-17", severity: 5, location: "Gifu, Japan", victim: "Miyuki Noda", type: "murder", description: "Woman strangled, attacker takes 100,000 yen worth of BTC" },
+  { date: "2017-09-04", severity: 4, location: "Kyiv, Ukraine", victim: "Alexey Sherstne", type: "torture", description: "Man tortured for $50k in Bitcoins" },
+  { date: "2017-10-16", severity: 2, location: "Durham, North Carolina, United States", victim: "Jameson Lopp", type: "swatting", description: "Bitcoin developer swatted & extorted" },
+  { date: "2017-10-15", severity: 3, location: "Toulouse, France", victim: "Multiple", type: "armed_robbery", description: "4 bitcoin traders robbed at gunpoint" },
+  { date: "2017-10-15", severity: 3, location: "Los Angeles, California, United States", victim: "Multiple", type: "armed_robbery", description: "Discount Bitcoin Bandits committed 5 robberies at gunpoint" },
+  { date: "2017-11-04", severity: 2, location: "New York, New York, United States", victim: "Unidentified", type: "robbery", description: "Man robbed of $1.8M of ETH" },
+  { date: "2017-11-15", severity: 3, location: "Istanbul, Turkey", victim: "Unidentified", type: "kidnapping", description: "Gang stole $2.83M in BTC from businessman" },
+  { date: "2017-12-15", severity: 1, location: "Reykjavik, Iceland", victim: "Unidentified", type: "theft", description: "600 Bitcoin ASICs stolen" },
+  { date: "2017-12-26", severity: 3, location: "Kyiv, Ukraine", victim: "Pavel Lerner", type: "kidnapping", description: "Bitcoin exchange owner kidnapped & ransomed for $1M" },
+  { date: "2018-01-01", severity: 3, location: "Los Angeles, California, United States", victim: "T.W.", type: "home_invasion", description: "Home invasion by FBI impersonator who demanded laptop passwords to access cryptocurrency" },
+  { date: "2018-01-03", severity: 3, location: "Milwaukee, Wisconsin, United States", victim: "Dallas", type: "armed_robbery", description: "Convicted felon accused of firing gun inside downtown Milwaukee condo during Bitcoin sale" },
+  { date: "2018-01-14", severity: 4, location: "Leningrad Oblast, Russia", victim: "Pavel Nyashin", type: "torture", description: "Blogger Who Boasted About Crypto Wealth Beaten and Robbed For $425k" },
+  { date: "2018-01-15", severity: 3, location: "Phuket, Thailand", victim: "Maxsim Latsoka & Anna Nikurina", type: "kidnapping", description: "Russian gang steals 100,000 Euros in BTC from young Russian couple" },
+  { date: "2018-01-18", severity: 2, location: "North Point, Hong Kong", victim: "____ Lee", type: "robbery", description: "Bitcoin trader lured to bogus meeting and robbed of HK$1.4M" },
+  { date: "2018-01-23", severity: 3, location: "Ottawa, Canada", victim: "Canadian Bitcoins", type: "armed_robbery", description: "Failed armed robbery attempt of Canadian bitcoin exchange" },
+  { date: "2018-01-27", severity: 3, location: "Moulsford, Oxfordshire, England", victim: "Danny Aston & Amy Jay", type: "home_invasion", description: "Armed home invasion of Bitcoin trading firm owner" },
+  { date: "2018-01-29", severity: 3, location: "Cumming, Georgia, United States", victim: "Unidentified", type: "home_invasion", description: "Five men arrested for planning armed home invasion of bitcoin owner" },
+  { date: "2018-01-15", severity: 2, location: "Odessa, Ukraine", victim: "Unidentified", type: "robbery", description: "Several men pose as bitcoin sellers, beat and rob buyer of 1.5 Million UAH ($57,000 USD)" },
+  { date: "2018-02-09", severity: 4, location: "Amreli, India", victim: "Sailesh Bhatt", type: "torture", description: "Police Officers Beat, Extorted 200 BTC from Businessman" },
+  { date: "2018-02-21", severity: 2, location: "Taichung, Taiwan", victim: "____ Tai", type: "robbery", description: "Four men assault bitcoin seller & transfer 18 BTC" },
+  { date: "2018-02-19", severity: 4, location: "Moscow, Russia", victim: "Unidentified", type: "torture", description: "Crypto investor has face mutilated, robbed of $1M in BTC" },
+  { date: "2018-02-23", severity: 4, location: "Moscow, Russia", victim: "Yury Mayorov", type: "torture", description: "Crypto Developer Beaten, Robbed Of 300 BTC" },
+  { date: "2018-03-01", severity: 3, location: "Killingly, Connecticut, United States", victim: "Undisclosed woman", type: "home_invasion", description: "2 women invaded home of another woman who had opened a Bitcoin account" },
+  { date: "2018-03-15", severity: 3, location: "Kyiv, Ukraine", victim: "Unidentified Miner", type: "kidnapping", description: "Miner kidnapped, extorted for $50,000. Kidnappers caught 8 months later" },
+  { date: "2018-03-22", severity: 2, location: "Irving & Mesquite, Texas, United States", victim: "Multiple gas stations", type: "robbery", description: "Robbers douse clerks with pepper spray, steal from Bitcoin ATMs" },
+  { date: "2018-04-08", severity: 2, location: "Singapore", victim: "Pang Joon Hau", type: "robbery", description: "Man seeking to buy BTC robbed of $365,000" },
+  { date: "2018-04-11", severity: 3, location: "Miami, Florida, United States", victim: "Ryan Rice", type: "armed_robbery", description: "Bitcoin buyer shoots robber in self defense" },
+  { date: "2018-04-25", severity: 3, location: "Dubai, UAE", victim: "2 unidentified Asian brothers", type: "armed_robbery", description: "Gang of 10 robbed two brothers of AED 7m ($1.9m) in cash" },
+  { date: "2018-06-06", severity: 3, location: "Milan, Italy", victim: "Unidentified 22-year-old", type: "armed_robbery", description: "Robbers attempt bitcoin purchase with counterfeit money, beat victims and fire gun, take 50,000 euros" },
+  { date: "2018-06-13", severity: 3, location: "China", victim: "Synth", type: "home_invasion", description: "Home invasion of Skycoin architect resulted in theft of 18.88 BTC and 6,466 SKY" },
+  { date: "2018-06-19", severity: 3, location: "Wels, Austria", victim: "Unidentified", type: "home_invasion", description: "$250,000 in cryptocurrency taken by robbers posing as postmen" },
+  { date: "2018-07-06", severity: 3, location: "Northborough, Massachusetts, United States", victim: "Austin Nedved", type: "home_invasion", description: "Armed home invasion of Localbitcoins trader" },
+  { date: "2018-09-07", severity: 4, location: "New York, New York, United States", victim: "Nicholas Truglia", type: "torture", description: "Friends accused of torturing pal to steal his cryptocurrency" },
+  { date: "2018-11-01", severity: 4, location: "Manchester, England", victim: "Kieran Hamilton", type: "torture", description: "Crypto trader stabbed, robbed by home invaders" },
+  { date: "2018-11-16", severity: 4, location: "Lanseria, South Africa", victim: "Andrew ______", type: "torture", description: "Bitcoin trader drugged, beaten, and tortured before transferring BTC to attackers" },
+  { date: "2019-02-10", severity: 4, location: "Drouwenerveen, Netherlands", victim: "Tjeerd H.", type: "torture", description: "Bitcoin trader tortured with drill in front of daughter" },
+  { date: "2019-03-12", severity: 1, location: "Far Cotton, Northampton, England", victim: "Costcutters", type: "theft", description: "Bitcoin machine stolen during robbery" },
+  { date: "2019-05-14", severity: 3, location: "Oslo, Norway", victim: "Undisclosed", type: "home_invasion", description: "Bitcoin millionaire escapes armed home invader by jumping off balcony" },
+  { date: "2019-06-30", severity: 4, location: "Jaipur, Rajasthan, India", victim: "Luftan Shaikh, Mohammad Shazad, Malang Shah", type: "torture", description: "Criminal Gang Abducts & Tortures Cryptocurrency Traders, Demands 80 BTC Ransom" },
+  { date: "2019-07-15", severity: 3, location: "Sparkhill, Birmingham, England", victim: "Bitcoin Exchange", type: "armed_robbery", description: "Masked raiders hold up Bitcoin Exchange in front of dozens of witnesses" },
+  { date: "2019-07-26", severity: 2, location: "Wels, Austria", victim: "Unidentified", type: "robbery", description: "Man raided in office" },
+  { date: "2019-08-26", severity: 5, location: "Dehradun, India", victim: "Abdul Shakoor", type: "murder", description: "Kingpin of Kerala bitcoin scam murdered in Dehradun" },
+  { date: "2019-11-19", severity: 1, location: "Vernon, British Columbia, Canada", victim: "Simply Delicious Food Market", type: "theft", description: "Thieves break into BTM" },
+  { date: "2020-01-01", severity: 5, location: "Abraka, Nigeria", victim: "Iroro Wisdom Ovie", type: "murder", description: "Man shot & killed by home invaders seeking $10,000 in bitcoin" },
+  { date: "2020-01-15", severity: 3, location: "Preston, Lancashire, England", victim: "17 y/o trader", type: "kidnapping", description: "Trader lured to apartment, kidnapped, driven around in car trunk" },
+  { date: "2020-01-08", severity: 3, location: "Bangkok, Thailand", victim: "Mark Cheng Jin Quan", type: "kidnapping", description: "Blockchain advisor kidnapped, held at gunpoint, extorted for $60,000 in bitcoin" },
+  { date: "2020-01-21", severity: 1, location: "Philadelphia, Pennsylvania, United States", victim: "Mayfair Quick Mart", type: "theft", description: "2 men break into BTM, steal cash box" },
+  { date: "2020-02-10", severity: 3, location: "Carlisle, England", victim: "Unidentified couple", type: "home_invasion", description: "Home invaders force victims to create crypto exchange accounts" },
+  { date: "2020-03-18", severity: 3, location: "Blantyre, Scotland", victim: "Unidentified siblings", type: "home_invasion", description: "Home invader beats woman with Toblerone, forces victim to transfer $200,000 of BTC" },
+  { date: "2020-05-17", severity: 3, location: "Ho Chi Minh City, Vietnam", victim: "Le Duc Nguyen", type: "kidnapping", description: "HCMC cops charged with $1.6 mln bitcoin robbery" },
+  { date: "2020-05-19", severity: 1, location: "East Lansdowne, Pennsylvania, United States", victim: "Exxon Gas Station", type: "theft", description: "2 subjects pry open BTM in broad daylight" },
+  { date: "2020-05-23", severity: 3, location: "Irvington, New York, United States", victim: "Ellis Pinsky", type: "home_invasion", description: "2 men commit home invasion of hacker, seeking tens of millions of dollars in bitcoin" },
+  { date: "2020-09-01", severity: 3, location: "Kent, England", victim: "Male Freshman", type: "armed_robbery", description: "Student robbed of bitcoin at knifepoint during first week at university" },
+  { date: "2020-10-01", severity: 4, location: "Kyiv, Ukraine", victim: "Unidentified", type: "torture", description: "Police kidnap a businessman, torture him, and force his wife to send them 7 bitcoin" },
+  { date: "2020-10-07", severity: 1, location: "Kelowna, British Columbia, Canada", victim: "Mike's Produce", type: "theft", description: "Botched Bitcoin theft destroys deli" },
+  { date: "2020-10-22", severity: 3, location: "Riga, Latvia", victim: "Undisclosed", type: "planned", description: "Man arrested for planning kidnapping and killing owners of cryptocurrencies" },
+  { date: "2020-12-01", severity: 2, location: "Dubai, UAE", victim: "Undisclosed", type: "robbery", description: "4 Ukrainian men attack Bitcoin buyer with deodorant" },
+  { date: "2020-12-24", severity: 4, location: "Ternopil, Ukraine", victim: "Undisclosed", type: "torture", description: "Man kidnapped and tortured for $800k" },
+  { date: "2021-01-01", severity: 2, location: "Sliema, Malta", victim: "Dillon Attard", type: "robbery", description: "Victim describes his disbelief as $700,000 stolen in front of him" },
+  { date: "2021-01-05", severity: 2, location: "Chai Wan, Hong Kong", victim: "37 y/o man", type: "robbery", description: "Robbers take US$387,000 in cash, 15BTC from man after in-person trade" },
+  { date: "2021-01-18", severity: 3, location: "Kwun Tong, Hong Kong", victim: "Unidentified Woman", type: "armed_robbery", description: "Gang snatches HK$3.5 million from trader at knifepoint" },
+  { date: "2021-01-23", severity: 3, location: "Olsztyn, Poland", victim: "Physical Exchange Employees", type: "armed_robbery", description: "Two employees shot at physical Bitcoin exchange FlyingAtom" },
+  { date: "2021-02-04", severity: 3, location: "Stockholm, Sweden", victim: "Married Couple", type: "home_invasion", description: "Armed robbers invade home and force owners to hand over 1M+ SEK in BTC" },
+  { date: "2021-02-01", severity: 3, location: "Gujranwala, Pakistan", victim: "Swiss & German", type: "armed_robbery", description: "Armed robbers take $93k in BTC at gunpoint" },
+  { date: "2021-03-10", severity: 4, location: "Recife, Brazil", victim: "Bank director", type: "torture", description: "Man kidnapped by a gang, tied up, and had two teeth knocked out. Released after 4.78 BTC transferred" },
+  { date: "2021-03-16", severity: 2, location: "Munich, Germany", victim: "29 y/o Berlin man", type: "robbery", description: "Robbers steal bitcoin worth almost 100,000 Euros" },
+  { date: "2021-03-18", severity: 3, location: "Mendoza, Argentina", victim: "F.T.", type: "armed_robbery", description: "Armed robbers steal iPhone, $5k at gunpoint" },
+  { date: "2021-04-08", severity: 3, location: "Zaporizhya, Ukraine", victim: "30 year old miner", type: "armed_robbery", description: "Mining farm owner shoots at looters" },
+  { date: "2021-04-13", severity: 3, location: "Calgary, Alberta, Canada", victim: "Undisclosed", type: "home_invasion", description: "Armed men force their way into Canyon Meadows home, steal cryptocurrency keys" },
+  { date: "2021-05-01", severity: 3, location: "Bradford, Yorkshire, England", victim: "14 y/o boy", type: "kidnapping", description: "Teen bitcoin trader kidnapped & ransomed" },
+  { date: "2021-05-01", severity: 2, location: "Bethesda, Maryland, United States", victim: "___ Ghershony", type: "robbery", description: "Son drugs father, steals $400K in BTC" },
+  { date: "2021-06-11", severity: 2, location: "Gyeonggi Province, South Korea", victim: "40 y/o man", type: "robbery", description: "Woman drugs man she met on chat app, steals $87K from his phone" },
+  { date: "2021-06-14", severity: 4, location: "Kwun Tong, Hong Kong", victim: "22 y/o man", type: "torture", description: "Trader temporarily blinded, HK$2 million stolen" },
+  { date: "2021-06-24", severity: 4, location: "Leeuwarden, Netherlands", victim: "39 y/o man", type: "torture", description: "3 men posing as service technicians beat password out of Bitcoin owner" },
+  { date: "2021-07-01", severity: 4, location: "Omsk, Russia", victim: "Unidentified man", type: "torture", description: "3 men kidnap and extort over $1M in crypto from victim" },
+  { date: "2021-07-01", severity: 2, location: "Colombia", victim: "Unidentified man", type: "robbery", description: "Bitcoin holder drugged and robbed by Tinder date" },
+  { date: "2021-07-14", severity: 3, location: "Lagos, Nigeria", victim: "Morakinyo Peter & Yusuf Dayo", type: "armed_robbery", description: "Law Enforcement Officers rob 2 men of $50K USD in bitcoin at gunpoint" },
+  { date: "2021-07-28", severity: 3, location: "Tsim Sha Tsui, Hong Kong", victim: "39 y/o man", type: "armed_robbery", description: "Trader robbed of HK$3 million at knifepoint" },
+  { date: "2021-08-01", severity: 2, location: "Dubai, UAE", victim: "3 women", type: "robbery", description: "4 Africans rob three women of $100,000 in a fake Bitcoin deal" },
+  { date: "2021-08-08", severity: 5, location: "Sao Pedro da Aldeia, Brazil", victim: "Wesley Pessano Santarem", type: "murder", description: "Crypto Trader's Murder Blamed On Social Media Bragging" },
+  { date: "2021-08-18", severity: 5, location: "Plancher-Bas, France", victim: "Simon Arthuis", type: "murder", description: "Computer engineering student drugged, tortured, and killed by 5 men for €200,000 in cryptocurrency" },
+  { date: "2021-09-01", severity: 1, location: "Abkhazia", victim: "Unidentified 31 y/o", type: "theft", description: "Thieves break into garage, steal 20 mining servers worth $10,000" },
+  { date: "2021-09-09", severity: 3, location: "Westmere, New Zealand", victim: "Mark Geor", type: "home_invasion", description: "Safe containing $4M of cryptocurrency ripped from house" },
+  { date: "2021-10-01", severity: 3, location: "Tomsk, Russia", victim: "Miner", type: "home_invasion", description: "Armed Robbers attack Miner at his Home, Steal 86 BTC" },
+  { date: "2021-10-07", severity: 1, location: "South Bay, California, United States", victim: "Liquor Store", type: "theft", description: "Thieves Break Into Liquor Store to Steal Bitcoin ATM" },
+  { date: "2021-10-20", severity: 5, location: "Abkhazia", victim: "Astamur Ardzibna", type: "murder", description: "Man Shot Dead in Hail of Gunfire Over Crypto Mining Rigs" },
+  { date: "2021-11-02", severity: 4, location: "Madrid, Spain", victim: "Zaryn Dentzel", type: "torture", description: "Home invaders torture social media founder, take tens of millions of euros in bitcoin" },
+  { date: "2021-11-06", severity: 4, location: "Hong Kong", victim: "39 y/o trader", type: "torture", description: "Crypto trader kidnapped by Triad gang, beaten with hammers" },
+  { date: "2021-11-12", severity: 1, location: "Barcelona, Spain", victim: "GBTC Crypto Exchange", type: "theft", description: "Thieves rip bitcoin ATM from crypto store" },
+  { date: "2021-11-21", severity: 3, location: "Los Angeles, California, United States", victim: "E.Z.", type: "kidnapping", description: "Attempted robbery & kidnapping at gunpoint by business associate" },
+  { date: "2021-12-01", severity: 3, location: "Sukhumi, Abkhazia", victim: "Unidentified Family", type: "home_invasion", description: "2 masked men break into home, hold family at gunpoint before escaping with three servers and $2,040 in cash" },
+  { date: "2021-12-11", severity: 3, location: "Bali, Indonesia", victim: "Camilla Guadagnuolo & Principe Nerini", type: "armed_robbery", description: "Robbers take $400K in cash & bitcoin at knifepoint" },
+  { date: "2021-12-15", severity: 3, location: "Amsterdam, Netherlands", victim: "Vincent Everts", type: "home_invasion", description: "Armed home invaders threaten TV personality during livestream" },
+  { date: "2021-12-27", severity: 4, location: "Thunder Bay, Ontario, Canada", victim: "2 unidentified males", type: "torture", description: "11 Inmates take 2 inmates hostage, force them to transfer cryptocurrency" },
+  { date: "2022-01-16", severity: 1, location: "Memphis, Tennessee, United States", victim: "Gas Station", type: "theft", description: "Suspects smash gas station with truck, steal Bitcoin ATM" },
+  { date: "2022-01-21", severity: 3, location: "Hoboken, Belgium", victim: "34 y/o teacher", type: "home_invasion", description: "3 men invade home, fail to force owner to hand over 3M Euros of BTC" },
+  { date: "2022-01-26", severity: 3, location: "France", victim: "Owen Simonin", type: "home_invasion", description: "Fake insurance adjuster attempts armed home invasion, gets pushed and locked out by victim" },
+  { date: "2022-02-01", severity: 4, location: "Missouri, United States", victim: "John Forsyth", type: "torture", description: "Crypto founder kidnapped, zip-tied, threatened to be thrown off bridge" },
+  { date: "2022-02-02", severity: 4, location: "Pune, India", victim: "Vinay Naik", type: "torture", description: "8 including cop arrested for kidnapping man to extort Bitcoin worth Rs 300 crore ($50 million USD)" },
+  { date: "2022-02-03", severity: 4, location: "Surat, India", victim: "Vinay Jain", type: "torture", description: "Auto parts businessman brings suitcase full of $260K worth of cash to do an in-person crypto trade, gets beaten and robbed by 8 men" },
+  { date: "2022-02-03", severity: 4, location: "Brooklyn, New York, United States", victim: "Ilya Basin", type: "torture", description: "Crypto consultant hog-tied, beaten during home invasion" },
+  { date: "2022-03-01", severity: 3, location: "Dubai, UAE", victim: "bitcoin trader", type: "home_invasion", description: "4 men invade home, tie up man, steal $450K from safe" },
+  { date: "2022-03-02", severity: 3, location: "Miami, Florida, United States", victim: "Unidentified man", type: "armed_robbery", description: "Businessman ambushed by armed robber, has $1M watch & crypto wallet taken" },
+  { date: "2022-03-04", severity: 2, location: "Pune, India", victim: "Electronics Dealer", type: "extortion", description: "Woman cop suspended for bid to extort crypto from trader" },
+  { date: "2022-03-16", severity: 4, location: "New York, New York, United States", victim: "Pierrick Jamaux", type: "torture", description: "Crypto expert shot 5 times by robber seeking Richard Mille watch" },
+  { date: "2022-03-30", severity: 3, location: "Los Angeles, California, United States", victim: "E.Z.", type: "home_invasion", description: "Attempted home invasion by 3 armed men; victim fired gun at attackers, who fled" },
+  { date: "2022-04-01", severity: 3, location: "Dubai, UAE", victim: "Unidentified trader", type: "armed_robbery", description: "9 robbers invaded the office of a bitcoin trader and took over $1,000,000 in cash" },
+  { date: "2022-04-21", severity: 4, location: "Norrköping, Sweden", victim: "Unidentified couple", type: "torture", description: "Couple tied up and beaten, forced to transfer cryptocurrency" },
+  { date: "2022-05-01", severity: 2, location: "London, England", victim: "4 victims", type: "robbery", description: "Multiple incidents of crypto muggings around London" },
+  { date: "2022-05-01", severity: 2, location: "Dubai, UAE", victim: "Unidentified man", type: "robbery", description: "Crypto expert assaulted & robbed by investors for losing money" },
+  { date: "2022-05-20", severity: 3, location: "Klang, Malaysia", victim: "Factory Owner", type: "armed_robbery", description: "12 men rob aluminum factory, steal 180 Bitcoin ASICs" },
+  { date: "2022-06-01", severity: 4, location: "Osaka, Japan", victim: "Undisclosed", type: "torture", description: "Son of Mitsubishi Electric CEO + 7 men kidnap, torture gym member for crypto assets" },
+  { date: "2022-07-01", severity: 3, location: "Dubai, UAE", victim: "Asian Investor", type: "home_invasion", description: "Man suffers home invasion, loses ~$50,000 after attempting a face-to-face cash trade to buy bitcoin" },
+  { date: "2022-07-01", severity: 3, location: "Kuchino, Russia", victim: "Vkusvill Supermarket", type: "armed_robbery", description: "4 armed mask men rob warehouse, steal 100 GPUs" },
+  { date: "2022-08-06", severity: 3, location: "Manerba, Italy", victim: "30 y/o broker", type: "armed_robbery", description: "3 men follow a man home, hold him at knifepoint for BTC" },
+  { date: "2022-08-07", severity: 4, location: "Vrindavan Yojana, India", victim: "Arjun Bhargav", type: "torture", description: "3 men trick, abduct, torture realtor for 8 BTC" },
+  { date: "2022-09-01", severity: 4, location: "Richmond, British Columbia, Canada", victim: "Middle Aged Couple", type: "torture", description: "Multiple suspects posing as police invade home, tie up residents, steal $10M in crypto" },
+  { date: "2022-09-06", severity: 3, location: "Lincolnshire, England", victim: "19 y/o hacker", type: "home_invasion", description: "3 men, 1 posing as a cop, arrested while attempting home invasion" },
+  { date: "2022-09-12", severity: 3, location: "Winnipeg, Canada", victim: "19 y/o man", type: "armed_robbery", description: "Man held at gunpoint, assaulted and tied up during Bitcoin trade" },
+  { date: "2022-09-12", severity: 3, location: "Delray Beach, Florida, United States", victim: "Unidentified couple", type: "home_invasion", description: "Armed gang invades home, takes jewelry, electronics, cash. Tried but failed to drain Gemini account" },
+  { date: "2022-09-15", severity: 2, location: "Koh Samui, Thailand", victim: "Russian Couple", type: "robbery", description: "Russian couple extorted by gang of foreign men at coffee shop" },
+  { date: "2022-09-15", severity: 4, location: "Homestead, Florida, United States", victim: "Unidentified young man", type: "torture", description: "Armed gang invades home, takes jewelry, electronics. Kidnapped & tortured victim, failed to find his bitcoin" },
+  { date: "2022-11-01", severity: 4, location: "Barrie, Ontario, Canada", victim: "Female A.T.", type: "torture", description: "A woman was kidnapped, tied to a chair, stripped naked, hit in the legs with a hammer, and burned while attackers demanded $1 million in bitcoin" },
+  { date: "2022-12-01", severity: 4, location: "Toronto, Ontario, Canada", victim: "Aiden Pleterski", type: "torture", description: "Crypto king abducted, tortured, and beaten for days as his kidnappers sought millions in ransom" },
+  { date: "2022-12-01", severity: 3, location: "Moscow, Russia", victim: "Russian Businessman", type: "kidnapping", description: "Man kidnapped from his Bentley by 4 men, forced to give access to bitcoin wallet" },
+  { date: "2022-12-03", severity: 2, location: "Lelystad, Netherlands", victim: "Unidentified man", type: "robbery", description: "Man responds to ad to sell his bitcoin, is attacked by several men & forced to transfer 30K EUR worth of BTC & ETH" },
+  { date: "2022-12-11", severity: 3, location: "Phuket, Thailand", victim: "2 Russians", type: "kidnapping", description: "2 men who work on a cryptocurrency were kidnapped and robbed" },
+  { date: "2022-12-12", severity: 3, location: "Philippines", victim: "Chinese businessman", type: "kidnapping", description: "Chinese businessman kidnapped and held for six days in the Philippines" },
+  { date: "2022-12-22", severity: 4, location: "Little Elm, Texas, United States", victim: "Unidentified man", type: "torture", description: "Armed gang invades home, torture victims for 3 hours, take jewelry, fail to find hardware wallet with $1.4m" },
+  { date: "2023-01-05", severity: 2, location: "Salford, England", victim: "Karl Johnson", type: "extortion", description: "Man knocks on door, threatens to assault victim, leaves after he sends some cryptocurrency" },
+  { date: "2023-01-14", severity: 3, location: "Barcelona, Spain", victim: "Crypto Company", type: "armed_robbery", description: "5 men stormed into a company's office armed with tasers and zip ties" },
+  { date: "2023-01-25", severity: 3, location: "Salford, England", victim: "Karl Johnson", type: "armed_robbery", description: "2 men knock on door, threaten victim with knife, leave after he sends cryptocurrency" },
+  { date: "2023-02-01", severity: 3, location: "Melbourne, Australia", victim: "Saudi Royal", type: "kidnapping", description: "TikTok influencer lures Saudi royal to her home where he was imprisoned until he handed over $40K in BTC" },
+  { date: "2023-02-25", severity: 4, location: "Bali, Indonesia", victim: "Yuri Boytsov", type: "torture", description: "4 men invade crypto blogger's home, beat him until he transfers $284,000 in BTC" },
+  { date: "2023-02-27", severity: 2, location: "Medellin, Colombia", victim: "German man", type: "robbery", description: "20 year old Venezuelan woman drugs and robs man of 1 BTC" },
+  { date: "2023-03-09", severity: 4, location: "Sydney, Australia", victim: "Peter Vuong", type: "torture", description: "Gang kidnaps boyfriend of crypto trader's relative, demands $5M ransom while torturing him for 6 days" },
+  { date: "2023-03-20", severity: 2, location: "Noida, India", victim: "Virendra Malik", type: "robbery", description: "Couple stages robbery to steal bitcoin from their friend, but he doesn't comply" },
+  { date: "2023-03-29", severity: 5, location: "Seoul, South Korea", victim: "48 y/o woman", type: "murder", description: "4 men kidnap woman, steal crypto, murder her" },
+  { date: "2023-04-01", severity: 4, location: "Dubai, UAE", victim: "Unidentified Woman", type: "torture", description: "Driver & 3 friends lured an investor into a fake deal, robbed, electrocuted, stripped naked, and took blackmail videos" },
+  { date: "2023-04-12", severity: 3, location: "Durham, North Carolina, United States", victim: "76 y/o couple", type: "home_invasion", description: "2 men posing as construction workers invade home, force transfer of $250K in crypto" },
+  { date: "2023-05-03", severity: 3, location: "Benalmádena, Spain", victim: "Unidentified man", type: "kidnapping", description: "3 men kidnap crypto businessman, demand €1 million ransom. He was rescued by police" },
+  { date: "2023-05-26", severity: 1, location: "Houston, Texas, United States", victim: "Smoke Shop", type: "theft", description: "7 men arrested after ramming store with stolen truck in failed attempt to steal Bitcoin ATM" },
+  { date: "2023-06-01", severity: 3, location: "Tel Aviv, Israel", victim: "Crypto Entrepreneur", type: "armed_robbery", description: "Crypto entrepreneur robbed at gunpoint in his home in Tel Aviv" },
+  { date: "2023-07-16", severity: 3, location: "Queens, New York, United States", victim: "Unknown Couple", type: "home_invasion", description: "Fake FBI agents in Porsche tase and tie up couple, steal Mercedes, $40K in cash, crypto" },
+  { date: "2023-09-03", severity: 3, location: "Phuket, Thailand", victim: "Italian man", type: "armed_robbery", description: "Russian MMA fighter & twin brother rob man of watches, seek Ledger wallet" },
+  { date: "2023-10-01", severity: 4, location: "Cardishead, England", victim: "Karl Johnson", type: "torture", description: "Victim dragged into a flat, tied up, assaulted, locked in a cupboard all night until they received cryptocurrency" },
+  { date: "2023-10-15", severity: 3, location: "Salford, England", victim: "Karl Johnson", type: "kidnapping", description: "Days after previous attack, victim was kidnapped, had bag placed over head, released after sending cryptocurrency" },
+  { date: "2023-10-30", severity: 3, location: "Tbilisi, Georgia", victim: "Crypto Exchange", type: "armed_robbery", description: "6 men rob exchange office, take $900K USD in crypto" },
+  { date: "2023-11-06", severity: 4, location: "Rönninge, Sweden", victim: "Middle-aged couple", type: "torture", description: "Couple tied up, beaten, and threatened with their own kitchen knives" },
+  { date: "2023-11-10", severity: 4, location: "Montenegro", victim: "Binance Client", type: "torture", description: "Executives lured into fake business trip, kidnapped, forced to empty wallets of $12M USDT" },
+  { date: "2023-11-10", severity: 4, location: "Portland, Oregon, United States", victim: "21 y/o man", type: "torture", description: "4 men fly from FL to OR, kidnap target from apartment, torture him until he revealed seed phrase" },
+  { date: "2023-11-30", severity: 3, location: "Salford, England", victim: "Karl Johnson", type: "kidnapping", description: "Victim was kidnapped from a friend's house, had bag placed over head, rescued by police after anonymous tip sent" },
+  { date: "2023-12-25", severity: 3, location: "Izhevsk, Russia", victim: "23 y/o miner", type: "kidnapping", description: "Miner kidnapped from home, ransomed, rescued by police" },
+  { date: "2024-01-16", severity: 4, location: "Cluj, Romania", victim: "42 y/o man", type: "torture", description: "Restaurant owner kidnapped, doused in diesel, force fed alcohol, has finger cut off, until he transferred $200K USD in crypto" },
+  { date: "2024-01-31", severity: 3, location: "Phuket, Thailand", victim: "Belarusian couple (23 y/o man)", type: "kidnapping", description: "5 Russians arrested in crypto abduction case (~USD 801,200)" },
+  { date: "2024-03-01", severity: 2, location: "Scottsdale, Arizona, United States", victim: "Uber Riders", type: "robbery", description: "Fake Uber driver stole $200K+ in crypto from customers' Coinbase accounts by taking their phones" },
+  { date: "2024-03-10", severity: 3, location: "Montreal, Quebec, Canada", victim: "Young Couple", type: "kidnapping", description: "Gang of 4 kidnaps couple and robs them of $25,000 in cryptocurrency" },
+  { date: "2024-03-15", severity: 2, location: "Samui Island, Thailand", victim: "___ Yevgini", type: "robbery", description: "Gang of 6 Russians robs Russian man and wife at coffee shop for 1.8 million baht in BTC" },
+  { date: "2024-04-18", severity: 3, location: "Lianhe Zaobao, Singapore", victim: "11 Traders", type: "armed_robbery", description: "4 men rob suspected Chinese crypto gambling ring of $3M USD" },
+  { date: "2024-04-27", severity: 3, location: "Port Moody, British Columbia, Canada", victim: "Undisclosed", type: "home_invasion", description: "Violent home invasion, suspect arrested at airport and eventually sentenced to 7 years" },
+  { date: "2024-05-05", severity: 2, location: "London, England", victim: "Quentin Cepeljac", type: "robbery", description: "Belgian barber brags about being successful crypto dealer to impress woman. She invites him to her luxury flat, which ends up being a wrench attack trap. Turned out he only had £6.71 in crypto" },
+  { date: "2024-06-17", severity: 3, location: "London, England", victim: "Ramesh Nair", type: "home_invasion", description: "3 men armed with machetes invade home, force owner to transfer 1,000+ ETH" },
+  { date: "2024-07-03", severity: 3, location: "Tseung Kwan, Hong Kong", victim: "3 y/o boy", type: "kidnapping", description: "2 women abduct toddler from mall, demand $660,000 USDT ransom" },
+  { date: "2024-07-10", severity: 3, location: "Angers, France", victim: "Undisclosed Man", type: "home_invasion", description: "2 men invade home, threaten victim with knife & crowbar, demand 10,000 EUR" },
+  { date: "2024-07-11", severity: 3, location: "Cyberjaya, Malaysia", victim: "Chinese National", type: "kidnapping", description: "18 people kidnap 2 victims, hold them for $1.2M ransom, get in shootout with police" },
+  { date: "2024-07-12", severity: 4, location: "Bangkok, Thailand", victim: "British Crypto Trader", type: "torture", description: "5 people tie up trader, assault, and rob him" },
+  { date: "2024-07-22", severity: 3, location: "Bavdhan, India", victim: "26 y/o Trading Coach", type: "kidnapping", description: "Gang of 5 kidnaps trader and robs him at knifepoint of $18,000 in USDT" },
+  { date: "2024-07-28", severity: 5, location: "Kyiv, Ukraine", victim: "29 y/o Moroccan man", type: "murder", description: "4 men kidnap foreigner, rob, & murder him for 3 BTC" },
+  { date: "2024-07-29", severity: 3, location: "Tallinn, Estonia", victim: "Tim Heath", type: "home_invasion", description: "Crypto billionaire attacked at rental home by men posing as painters, successfully fights them off and prevents kidnapping" },
+  { date: "2024-08-07", severity: 3, location: "Puntarenas, Costa Rica", victim: "11 Israelis", type: "armed_robbery", description: "8 men, possibly police, overpower security guard, rob 11 tourists of 10+ BTC" },
+  { date: "2024-08-04", severity: 3, location: "Bangkok, Thailand", victim: "Ke Jibao", type: "home_invasion", description: "Gang of 4 Chinese nationals sneak into gated estate, commit armed home invasion, rob $2M USD of cryptocurrency" },
+  { date: "2024-08-15", severity: 4, location: "Verdun, Quebec, Canada", victim: "Undisclosed", type: "torture", description: "3 men invade home of crypto entrepreneur, torture him for hours until he transfers $15K" },
+  { date: "2024-08-25", severity: 3, location: "Danbury, Connecticut, United States", victim: "Radhika & Suchil Chetal", type: "kidnapping", description: "Parents of $243M heist thieves get carjacked & kidnapped in botched ransom plot" },
+  { date: "2024-08-29", severity: 2, location: "Hougang, Singapore", victim: "19 y/o", type: "robbery", description: "Man seeks p2p trade of cash for USDT, punched by attackers, successfully escapes" },
+  { date: "2024-09-13", severity: 5, location: "Villa Carlos Paz, Argentina", victim: "Gabriel Di Noto", type: "murder", description: "Accountant / crypto trader met a woman on Tinder, likely drugged, beaten by several men, forced to transfer funds, then murdered" },
+  { date: "2024-10-01", severity: 3, location: "Sofia, Bulgaria", victim: "35 y/o man", type: "kidnapping", description: "2 men posed as police, kidnapped victim, held a gun at his head for an hour and demanded 14 bitcoin from him. They failed to get any BTC" },
+  { date: "2024-10-27", severity: 3, location: "Chicago, Illinois, United States", victim: "3 Family Members and a Nanny", type: "kidnapping", description: "6 men accused of kidnapping family from Chicago townhouse and forcing a transfer of $15 million in cryptocurrency" },
+  { date: "2024-11-01", severity: 3, location: "Las Vegas, Nevada, United States", victim: "Unidentified man", type: "kidnapping", description: "3 teens kidnap man who hosted a crypto event. Drove him out to the desert, forced him to transfer $4 million at gunpoint" },
+  { date: "2024-11-04", severity: 4, location: "Victoriaville, Québec, Canada", victim: "Forum Moderator", type: "torture", description: "Attempted kidnapping by 4 individuals who wanted to torture him to steal forum mod's bitcoins" },
+  { date: "2024-11-06", severity: 3, location: "Toronto, Ontario, Canada", victim: "Dean Skurka", type: "kidnapping", description: "WonderFi CEO kidnapped during rush hour, held until $1M ransom paid" },
+  { date: "2024-11-08", severity: 3, location: "Phuket, Thailand", victim: "Viacheslav Leibov", type: "armed_robbery", description: "Tourist robbed by armed gang in friend's hotel room, forced to transfer $250K USDT" },
+  { date: "2024-11-20", severity: 1, location: "United States", victim: "Gen Z Quant kid", type: "theft", description: "13 year old's dog stolen after he rug pulled a token on pump.fun" },
+  { date: "2024-11-22", severity: 3, location: "Las Vegas, Nevada, United States", victim: "Undisclosed Man", type: "kidnapping", description: "Sex worker accused of kidnapping, stealing $300K in crypto from man she met at nightclub" },
+  { date: "2024-12-01", severity: 2, location: "Chengdu, China", victim: "Wang Shu", type: "robbery", description: "Software engineer lured by X account promising sex, ambushed at hotel by a gang that robbed him of 6 BTC" },
+  { date: "2024-12-03", severity: 1, location: "Melbourne, Australia", victim: "Coinflip ATM", type: "theft", description: "Crypto ATM stolen from shopping center" },
+  { date: "2024-12-15", severity: 4, location: "Ungasan, Bali, Indonesia", victim: "Igor Lermakov", type: "torture", description: "A Russian gang of 4 men ambushed a Ukrainian on the road in Bali. The victim was kidnapped and beaten until he handed over $200,000 in cryptocurrency" },
+  { date: "2024-12-19", severity: 4, location: "Laboma Beach, Ghana", victim: "Benjamin Appiah Boateng", type: "torture", description: "Businessman lured to meeting, handcuffed, beaten, electrocuted for 15 hours before being rescued by police" },
+  { date: "2024-12-24", severity: 3, location: "Brussels, Belgium", victim: "Stéphane Winkel's Wife", type: "kidnapping", description: "Wife of crypto influencer who bragged about wealth was kidnapped by 3 men, police chase led to car crash" },
+  { date: "2024-12-24", severity: 2, location: "Limassol, Cyprus", victim: "Undisclosed Man", type: "robbery", description: "Christmas Eve Limassol heist as man gets away with 100 thousand Euros in cash" },
+  { date: "2024-12-25", severity: 3, location: "Karachi, Pakistan", victim: "Arsalan Malik", type: "kidnapping", description: "Crypto trader in Karachi, Pakistan abducted by 5 men in a police van and forced to transfer $340,000 at gunpoint" },
+  { date: "2024-12-28", severity: 3, location: "Los Angeles, California, United States", victim: "Undisclosed", type: "home_invasion", description: "LAPD officer commits home invasion, robs $200,000 in cryptocurrency from 2 victims" },
+  { date: "2025-01-01", severity: 3, location: "Saint-Genis-Pouilly, France", victim: "Influencer's father", type: "kidnapping", description: "Crypto influencer's father was kidnapped on New Year's Eve" },
+  { date: "2025-01-05", severity: 2, location: "Phuket, Thailand", victim: "Russian Man", type: "robbery", description: "Man attacked and tied up in hotel, refuses to give up phone password, is knocked out and has cash stolen" },
+  { date: "2025-01-13", severity: 3, location: "Miami, Florida, United States", victim: "Miami Jeweler", type: "planned", description: "Gang of 4 men arrested by FBI on their way to rob jeweler of $2M" },
+  { date: "2025-01-14", severity: 3, location: "Pattaya, Thailand", victim: "Masis Erkol", type: "kidnapping", description: "Man tied up in condo, forced to transfer $290,000 in cryptocurrency" },
+  { date: "2025-01-16", severity: 3, location: "Makati, Philippines", victim: "Taehwa Kim", type: "kidnapping", description: "Korean bitcoin trader kidnapped, held hostage for 3 days. No crypto taken" },
+  { date: "2025-01-20", severity: 2, location: "Jeju, South Korea", victim: "Chinese National", type: "robbery", description: "Gang of 6 people meet OTC trader in luxury hotel, assault and rob him of $580K in cash and crypto" },
+  { date: "2025-01-21", severity: 4, location: "Vierzon, France", victim: "David Balland & Wife", type: "torture", description: "Ledger co-founder & wife kidnapped and ransomed, his finger was severed, rescued by GIGN. Ransom was partially paid but later seized via Tether" },
+  { date: "2025-01-24", severity: 3, location: "Troyes, France", victim: "30 y/o man", type: "kidnapping", description: "Crypto miner was lured to a meeting, taken hostage, 20K EUR ransom demanded. Police rescued him & arrested 4 suspects" },
+  { date: "2025-01-30", severity: 3, location: "Campo Limpo Paulista, Brazil", victim: "Brazilian Family", type: "home_invasion", description: "Criminals invade home, hold family hostage, force transfer of $16,000 USD in cryptocurrencies" },
+  { date: "2025-02-01", severity: 2, location: "Okota, Lagos", victim: "Unidentified man", type: "robbery", description: "Woman conspires with brother & gang to rob her boyfriend of 3 iPhones and $10K USD of bitcoin" },
+  { date: "2025-02-02", severity: 3, location: "Costa del Sol, Spain", victim: "34 y/o man", type: "kidnapping", description: "Crypto trader randomly met men at a hotel and told them what he did for a living. They later invited him over, took him hostage, demanded 30K EUR ransom" },
+  { date: "2025-02-08", severity: 3, location: "Paris, France", victim: "20 y/o man", type: "kidnapping", description: "Crypto investor lured to meeting by woman, abducted by 3 men who demand 40K EUR" },
+  { date: "2025-02-24", severity: 4, location: "Jeju City, South Korea", victim: "30 y/o Chinese Man", type: "torture", description: "4 Chinese suspects stab man lured to perform a trade in hotel room, steal 85 million won" },
+  { date: "2025-02-28", severity: 3, location: "Ho Chi Minh City, Vietnam", victim: "Chinese Man", type: "kidnapping", description: "Chinese gang kidnaps victim, extorts 600,000 USDT, are quickly apprehended by police" },
+  { date: "2025-03-01", severity: 4, location: "Sweden", victim: "30 y/o man", type: "torture", description: "Victim kidnapped by gang who took him into the woods, kicked and punched him, poured gasoline over him, threatened to set him on fire, placed pliers to his hand, and threatened to cut off his fingers" },
+  { date: "2025-03-02", severity: 3, location: "Houston, Texas, United States", victim: "Kaitlyn Siragusa", type: "home_invasion", description: "Popular Streamer Amouranth posts screenshot of $20M BTC wallet, becomes victim of armed home invasion. Her husband defended her by shooting an attacker" },
+  { date: "2025-03-13", severity: 2, location: "Lai Chi Kok, Hong Kong", victim: "41 y/o Wong", type: "robbery", description: "Man sells HK $318,000 worth of cryptocurrency, is then beaten with a stick and robbed of the cash he received" },
+  { date: "2025-03-21", severity: 3, location: "Imbiribeira, Brazil", victim: "Retired Teacher", type: "kidnapping", description: "Crypto manager surveilled, mother kidnapped, ransomed for 5 BTC. 4 people were later arrested" },
+  { date: "2025-03-23", severity: 4, location: "Ipiranga, Brazil", victim: "Spanish Businessman", type: "torture", description: "Man kidnapped by 2 fake police officers, held for a week and drugged, demanded $50M, escaped on his own" },
+  { date: "2025-03-27", severity: 3, location: "Tsim Sha Tsui, Hong Kong", victim: "27 y/o Turkish man", type: "armed_robbery", description: "Man brought a bag containing €5 million in cash to trade for crypto when he was attacked by two assailants, one of whom slashed him with a knife. He fought them off" },
+  { date: "2025-03-29", severity: 5, location: "Mecauayan, Bulacan, Philippines", victim: "Anson Que", type: "murder", description: "Businessman lured by woman to house & taken hostage. Attackers demanded $20M in cryptocurrency & received over $3M in multiple tranches. They killed the victim anyway" },
+  { date: "2025-04-13", severity: 3, location: "PIB Colony, Pakistan", victim: "Ismail", type: "kidnapping", description: "Gang poses as police, kidnaps victim, forces him to hand over Bitcoin" },
+  { date: "2025-05-01", severity: 4, location: "Paris, France", victim: "Undisclosed man", type: "torture", description: "Father of crypto millionaire abducted in broad daylight, 5M EUR ransom demanded, finger severed before being rescued by police" },
+  { date: "2025-05-06", severity: 4, location: "New York, New York, United States", victim: "28 y/o Italian man", type: "torture", description: "Crypto entrepreneur tortures man for weeks with a chainsaw & taser in a luxury $30K+ per month apartment. Victim escaped w/o giving up funds" },
+  { date: "2025-05-09", severity: 2, location: "London, England", victim: "Jacob Irwin-Cline", type: "robbery", description: "American tourist drugged by fake Uber driver who drained wallets of $123K in BTC & XRP" },
+  { date: "2025-05-13", severity: 3, location: "Paris, France", victim: "Pierre Noizat's daughter", type: "kidnapping", description: "Attempted abduction of crypto exchange CEO's daughter in broad daylight, caught on camera, attackers were fought off by her partner & bystanders" },
+  { date: "2025-05-14", severity: 3, location: "Coronel Bogado, Paraguay", victim: "Mining Facility", type: "armed_robbery", description: "3 Chinese citizens entered Paraguay illegally, tried to rob a mining facility, got in a shootout with police, were deported" },
+  { date: "2025-05-17", severity: 3, location: "Kampala, Uganda", victim: "Festo Ivaibi", type: "kidnapping", description: "Crypto founder abducted by men posing as military, forced to transfer $500,000 at gunpoint. One suspect later arrested" },
+  { date: "2025-05-18", severity: 3, location: "Normandie, France", victim: "Mother & Son", type: "planned", description: "Victims were being surveilled, had GPS tracker placed on their car. Police counter-surveilled the kidnappers and arrested 5 people before they attacked" },
+  { date: "2025-05-21", severity: 2, location: "Seoul, South Korea", victim: "Unidentified man", type: "robbery", description: "Russian nationals lure victim to hotel for crypto trade, attempt to rob him of 1 billion won, but victim escaped" },
+  { date: "2025-05-26", severity: 3, location: "Nantes, France", victim: "Crypto Entrepreneur", type: "planned", description: "Police arrest 10 men in balaclavas, foiling their attempted kidnapping of a crypto entrepreneur" },
+  { date: "2025-05-27", severity: 3, location: "Buenos Aires, Argentina", victim: "Russian Couple", type: "kidnapping", description: "Chechens invite victims to dinner, take them hostage and demand ransom. A friend sends them $43,000 and they flee to UAE" },
+  { date: "2025-06-13", severity: 3, location: "Juvisy-sur-Orge, France", victim: "26 y/o man", type: "kidnapping", description: "TikTok trader kidnapped by 4 men as he was returning home, attackers demanded 50K EUR, released after opening his wallet and finding a tiny balance" },
+  { date: "2025-06-17", severity: 3, location: "Maisons-Alfort, France", victim: "23 y/o man", type: "kidnapping", description: "A 23-year-old man was held for several hours, and the kidnappers demanded a 5k ransom from his wife" },
+  { date: "2025-06-24", severity: 5, location: "Goiania, Brazil", victim: "Undisclosed businessman", type: "murder", description: "Victim tricked into attending a business meeting that ended up being a wrench attack trap. Attack failed, 2 attackers were killed by police, mastermind was caught fleeing to Miami" },
+  { date: "2025-06-25", severity: 2, location: "Bengaluru, India", victim: "33 y/o businessman", type: "robbery", description: "OTC trade of $240,000 worth of rupees into USDT. Half a dozen men interrupted the transaction and robbed him" },
+  { date: "2025-06-30", severity: 2, location: "Bangkok, Thailand", victim: "3 people", type: "robbery", description: "OTC trade of $100,000 USD worth of baht for crypto in a mall parking garage. The 7 suspects had done smaller trades with the victims previously" },
+  { date: "2025-07-07", severity: 2, location: "Suresnes, France", victim: "Woman", type: "robbery", description: "A woman was attacked at her home and punched 10 times in front of her husband and children" },
+  { date: "2025-07-08", severity: 3, location: "Queens, New York, United States", victim: "38 y/o man", type: "kidnapping", description: "Victim kidnapped by 6 men and held for 10 days until he transferred $6,000 in fiat & cryptocurrency" },
+  { date: "2025-07-14", severity: 3, location: "Jodhpur, India", victim: "Dilip Gaud & Ramesh Sharma", type: "extortion", description: "5 constables kidnap 2 men and extort them with threats of false criminal charges until they handed over cash and $9,000 USD worth of cryptocurrency. Cops were later arrested and fired" },
+  { date: "2025-07-15", severity: 3, location: "Ahmedabad, India", victim: "Prince Pandey", type: "kidnapping", description: "3 men lured a trader into a trap and assaulted him while demanding 50,000 USDT. The victim's father contacted police and they managed to find and rescue him" },
+  { date: "2025-08-02", severity: 3, location: "Parañaque City, Philippines", victim: "30 y/o man", type: "kidnapping", description: "4 Chinese nationals kidnapped a man seeking money transfer services. Victim was handcuffed, threatened with a firearm, physically harmed, and forced to transfer $50,000" },
+  { date: "2025-08-05", severity: 4, location: "Paris, France", victim: "Unidentified man", type: "torture", description: "5 men threatened, kidnapped, and beat a crypto industry worker before stealing 2M euros in bitcoin from him. The attackers were quickly captured by police" },
+  { date: "2025-08-06", severity: 3, location: "Oslo, Norway", victim: "Norwegian family", type: "home_invasion", description: "Robbers posing as food-delivery workers tied up a family with three children in their home and threatened to shoot the mother unless the family handed over their cryptocurrency" },
+  { date: "2025-08-22", severity: 3, location: "Colombo, Sri Lanka", victim: "Chinese businessman", type: "kidnapping", description: "Chinese nationals kidnap man, hold him hostage for a day until he hands over 60,000 USDT" },
+  { date: "2025-08-26", severity: 3, location: "Paris, France", victim: "Alexandre, Crypto trader", type: "kidnapping", description: "A former cryptocurrency trader, aged 35, was kidnapped and held captive between Paris and Saint-Germain-en-Laye. The kidnappers demanded €10K from his wife for his release" },
+  { date: "2025-08-27", severity: 2, location: "Phuket, Thailand", victim: "Alexander", type: "robbery", description: "A Russian national went to a house for a business investment consultation. When he arrived a group of 4 Russians assaulted him and forced him to transfer 35,000 USDT" },
+  { date: "2025-08-29", severity: 4, location: "Valence, Drôme, France", victim: "23 y/o Swiss man", type: "torture", description: "A man was kidnapped and tortured for 4 days, possible mistaken identity. He was rescued by GIGN and 7 suspects were arrested" },
+  { date: "2025-09-05", severity: 3, location: "Cambridge, Ontario, Canada", victim: "Undisclosed Youth", type: "kidnapping", description: "Victim forced into a van by 5 men, physically assaulted, threatened with a gun. Released after being forced to transfer cryptocurrency" },
+  { date: "2025-09-07", severity: 4, location: "Herzliya, Israel", victim: "Israeli man", type: "torture", description: "Armed home-invasion: attackers bound and stabbed the resident, forced him to open an Exodus wallet and transferred ~4.94862 BTC and ~42,248.5 USDT (total ≈ $590k), stole a Trezor hardware wallet, laptop and a Rolex" },
+  { date: "2025-09-19", severity: 3, location: "Grant, Minnesota, United States", victim: "Family", type: "home_invasion", description: "Two brothers from Texas held a MN family hostage at gunpoint for nine hours, forced the father to drive 3 hours to the family cabin to transfer $36,000 in crypto. Son called 911 and attackers were caught" },
+  { date: "2025-09-26", severity: 3, location: "Rambouillet, Yvelines, France", victim: "42 y/o man", type: "kidnapping", description: "Three men and a woman climbed over the fence of a crypto entrepreneur's property to kidnap him" },
+  { date: "2025-09-28", severity: 3, location: "Tierp, Sweden", victim: "Farmer Family", type: "home_invasion", description: "Four people arrested after robbing family of millions of dollars worth of cryptocurrency" },
+  { date: "2025-10-01", severity: 3, location: "Val-de-Marne, France", victim: "Family", type: "home_invasion", description: "A woman and her two children were threatened by two masked individuals in order to blackmail her husband, who is a crypto investor" },
+  { date: "2025-10-02", severity: 5, location: "Dubai, UAE", victim: "Roman & Anna Novak", type: "murder", description: "Russian crypto scammer kidnapped, ransomed, murdered, dismembered by Russian nationals after ransom demands were not met" },
+  { date: "2025-10-10", severity: 4, location: "Kharkiv, Ukraine", victim: "Unidentified man", type: "torture", description: "Man kidnapped by 3 men in military uniform. He was zip tied, beaten, and threatened with weapons while being held hostage in a basement. Victim released after he transferred 83,000 USDT" },
+  { date: "2025-10-23", severity: 4, location: "Sanur Beach, Bali, Indonesia", victim: "Sergei Domogatskii", type: "torture", description: "Russian influencer kidnapped, beaten, tased, until he transferred $4,600 in cryptocurrency. Attackers later demanded $1M which he couldn't pay, after which he was released" },
+  { date: "2025-10-01", severity: 3, location: "Kahna, Pakistan", victim: "Waleed", type: "kidnapping", description: "Bitcoin trader kidnapped by 2 cops & 2 other attackers, released after family paid $45K ransom" },
+  { date: "2025-11-01", severity: 3, location: "Bangkok, Thailand", victim: "Chinese Man", type: "kidnapping", description: "3 men kidnap victim off street, force him to send $9,375 USDT. Attackers were later arrested" },
+  { date: "2025-11-04", severity: 3, location: "Oxford, England", victim: "Multiple", type: "armed_robbery", description: "Car with 3 women & 2 men robbed by 4 men, who forced an occupant to transfer £1.1 million in cryptocurrency. Attackers were later arrested" },
+  { date: "2025-11-22", severity: 3, location: "San Francisco, California, United States", victim: "Undisclosed", type: "home_invasion", description: "Armed robber posing as a delivery worker invaded home, tied up the homeowner, took $11 million worth of cryptocurrency" },
+  { date: "2025-11-22", severity: 3, location: "Chalon-sur-Saône, France", victim: "French man", type: "kidnapping", description: "Six men, including two minors, are suspected of having attempted to kidnap a man holding crypto for the fourth time" },
+  { date: "2025-11-24", severity: 2, location: "St. Petersburg, Russia", victim: "Crypto Exchange", type: "robbery", description: "21 y/o man robs exchange office with airsoft grenades & smoke grenades. He demanded employees transfer cryptocurrency to his wallet. He was arrested at the scene" },
+  { date: "2025-11-26", severity: 5, location: "Vienna, Austria", victim: "Danylo K", type: "murder", description: "Son of Ukrainian mayor of Kharkiv betrayed by fellow student, tortured, burned to death after revealing cryptocurrency wallets" },
+  { date: "2025-12-01", severity: 3, location: "Val-d'Oise, France", victim: "53 y/o man", type: "kidnapping", description: "The father of a crypto entrepreneur based in Dubai was kidnapped by 4 people" }
+];
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+const getYear = (date) => date.substring(0, 4);
+
+const getStatistics = () => {
+  const severityCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  const yearlyData = {};
+  
+  attacks.forEach(attack => {
+    severityCounts[attack.severity]++;
+    const year = getYear(attack.date);
+    if (!yearlyData[year]) {
+      yearlyData[year] = { year, s1: 0, s2: 0, s3: 0, s4: 0, s5: 0, total: 0 };
+    }
+    yearlyData[year][`s${attack.severity}`]++;
+    yearlyData[year].total++;
+  });
+  
+  return {
+    total: attacks.length,
+    severityCounts,
+    yearlyData: Object.values(yearlyData).sort((a, b) => a.year.localeCompare(b.year))
+  };
+};
+
+// ============================================================================
+// MAIN APP COMPONENT
+// ============================================================================
+
+export default function BitcoinAttacksApp() {
+  const [activeChart, setActiveChart] = useState('severity');
+  const [chartView, setChartView] = useState('stacked');
+  const [selectedYear, setSelectedYear] = useState(null);
+  
+  const stats = getStatistics();
+  const { severityCounts, yearlyData } = stats;
+  
+  // Calculate percentage data
+  const percentageData = yearlyData.map(row => ({
+    year: row.year,
+    total: row.total,
+    p1: Math.round((row.s1 / row.total) * 100),
+    p2: Math.round((row.s2 / row.total) * 100),
+    p3: Math.round((row.s3 / row.total) * 100),
+    p4: Math.round((row.s4 / row.total) * 100),
+    p5: Math.round((row.s5 / row.total) * 100),
+    c1: row.s1, c2: row.s2, c3: row.s3, c4: row.s4, c5: row.s5,
+    severeOrWorse: Math.round(((row.s4 + row.s5) / row.total) * 100),
+  }));
+  
+  // Calculate cumulative data
+  let cumS1 = 0, cumS2 = 0, cumS3 = 0, cumS4 = 0, cumS5 = 0;
+  const cumulativeData = yearlyData.map(item => {
+    cumS1 += item.s1; cumS2 += item.s2; cumS3 += item.s3; cumS4 += item.s4; cumS5 += item.s5;
+    return { year: item.year, s1: cumS1, s2: cumS2, s3: cumS3, s4: cumS4, s5: cumS5, total: cumS1 + cumS2 + cumS3 + cumS4 + cumS5 };
+  });
+  
+  // Pie chart data
+  const pieData = Object.entries(severityCounts).map(([severity, count]) => ({
+    name: SEVERITY_LEVELS[severity].label,
+    value: count,
+    severity: parseInt(severity)
+  }));
+  
+  // Get attacks for selected year
+  const selectedYearAttacks = selectedYear 
+    ? attacks.filter(a => a.date.startsWith(selectedYear)).sort((a, b) => b.severity - a.severity)
+    : [];
+
+  const avgSevereOrWorse = Math.round(((severityCounts[4] + severityCounts[5]) / attacks.length) * 100);
+
+  // Custom tooltips
+  const SeverityTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-gray-800 p-3 rounded-lg border border-gray-600">
+          <p className="font-bold text-white mb-2">{label}</p>
+          <p style={{ color: SEVERITY_LEVELS[5].color }}>Fatal: {data.s5}</p>
+          <p style={{ color: SEVERITY_LEVELS[4].color }}>Severe: {data.s4}</p>
+          <p style={{ color: SEVERITY_LEVELS[3].color }}>Serious: {data.s3}</p>
+          <p style={{ color: SEVERITY_LEVELS[2].color }}>Moderate: {data.s2}</p>
+          <p style={{ color: SEVERITY_LEVELS[1].color }}>Minor: {data.s1}</p>
+          <p className="text-white font-bold mt-2">Total: {data.total || (data.s1 + data.s2 + data.s3 + data.s4 + data.s5)}</p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const PercentageTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-gray-800 p-4 rounded-lg border border-gray-600 shadow-xl">
+          <p className="font-bold text-white text-lg mb-2">{label}</p>
+          <p className="text-gray-400 text-sm mb-3">{data.total} total attacks</p>
+          <div className="space-y-1">
+            <div className="flex justify-between gap-4">
+              <span style={{ color: SEVERITY_LEVELS[5].color }}>Fatal:</span>
+              <span className="text-white font-medium">{data.p5}% ({data.c5})</span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span style={{ color: SEVERITY_LEVELS[4].color }}>Severe:</span>
+              <span className="text-white font-medium">{data.p4}% ({data.c4})</span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span style={{ color: SEVERITY_LEVELS[3].color }}>Serious:</span>
+              <span className="text-white font-medium">{data.p3}% ({data.c3})</span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span style={{ color: SEVERITY_LEVELS[2].color }}>Moderate:</span>
+              <span className="text-white font-medium">{data.p2}% ({data.c2})</span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span style={{ color: SEVERITY_LEVELS[1].color }}>Minor:</span>
+              <span className="text-white font-medium">{data.p1}% ({data.c1})</span>
+            </div>
+          </div>
+          <div className="mt-3 pt-3 border-t border-gray-600">
+            <div className="flex justify-between gap-4">
+              <span className="text-gray-400">Severe+Fatal:</span>
+              <span className="text-red-400 font-bold">{data.severeOrWorse}%</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-white p-4 md:p-6">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-2xl md:text-3xl font-bold text-center mb-2 text-orange-500">
+          Physical Bitcoin/Crypto Attacks Analysis
+        </h1>
+        <p className="text-center text-gray-400 mb-4 text-sm">
+          Data: github.com/jlopp/physical-bitcoin-attacks • {attacks.length} total attacks
+        </p>
+        
+        {/* Severity Legend with Descriptions */}
+        <div className="bg-gray-800 rounded-xl p-4 mb-6">
+          <h3 className="text-sm font-semibold mb-3 text-gray-300">Severity Classification</h3>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+            {[5, 4, 3, 2, 1].map(sev => (
+              <div key={sev} className="flex items-start gap-2">
+                <div className="w-3 h-3 rounded mt-1 flex-shrink-0" style={{ backgroundColor: SEVERITY_LEVELS[sev].color }}></div>
+                <div>
+                  <span className="text-sm font-medium" style={{ color: SEVERITY_LEVELS[sev].color }}>
+                    {SEVERITY_LEVELS[sev].label}
+                  </span>
+                  <p className="text-xs text-gray-500">{SEVERITY_LEVELS[sev].description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* Chart Selector */}
+        <div className="flex justify-center gap-2 mb-6">
+          <button
+            onClick={() => setActiveChart('severity')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeChart === 'severity' ? 'bg-orange-500 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+          >
+            Absolute Numbers
+          </button>
+          <button
+            onClick={() => setActiveChart('percentage')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeChart === 'percentage' ? 'bg-orange-500 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+          >
+            Percentage Comparison
+          </button>
+        </div>
+        
+        {/* Stats Cards */}
+        <div className="grid grid-cols-5 gap-2 md:gap-4 mb-6">
+          {[5, 4, 3, 2, 1].map(sev => (
+            <div key={sev} className="bg-gray-800 rounded-lg p-2 md:p-4 text-center">
+              <div className="text-xl md:text-3xl font-bold" style={{ color: SEVERITY_LEVELS[sev].color }}>
+                {severityCounts[sev]}
+              </div>
+              <div className="text-xs text-gray-400 hidden md:block">{SEVERITY_LEVELS[sev].label}</div>
+              <div className="text-xs text-gray-500">{((severityCounts[sev] / attacks.length) * 100).toFixed(0)}%</div>
+            </div>
+          ))}
+        </div>
+
+        {/* ============================================================ */}
+        {/* CHART 1: ABSOLUTE SEVERITY NUMBERS */}
+        {/* ============================================================ */}
+        {activeChart === 'severity' && (
+          <>
+            {/* View Selector */}
+            <div className="flex flex-wrap justify-center gap-2 mb-6">
+              {['stacked', 'cumulative', 'distribution'].map(view => (
+                <button
+                  key={view}
+                  onClick={() => setChartView(view)}
+                  className={`px-3 py-2 rounded-lg font-medium text-sm transition-colors ${
+                    chartView === view ? 'bg-orange-500 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  {view.charAt(0).toUpperCase() + view.slice(1)}
+                </button>
+              ))}
+            </div>
+            
+            <div className="bg-gray-800 rounded-xl p-4 md:p-6 mb-6">
+              {chartView === 'stacked' && (
+                <>
+                  <h2 className="text-lg md:text-xl font-semibold mb-2 text-center">Attacks Per Year by Severity</h2>
+                  <p className="text-center text-gray-400 text-sm mb-4">Click a bar to see attack details</p>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <BarChart data={yearlyData} onClick={(data) => data && setSelectedYear(data.activeLabel)}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                      <XAxis dataKey="year" stroke="#9CA3AF" />
+                      <YAxis stroke="#9CA3AF" />
+                      <Tooltip content={<SeverityTooltip />} />
+                      <Bar dataKey="s1" stackId="a" fill={SEVERITY_LEVELS[1].color} name="Minor" />
+                      <Bar dataKey="s2" stackId="a" fill={SEVERITY_LEVELS[2].color} name="Moderate" />
+                      <Bar dataKey="s3" stackId="a" fill={SEVERITY_LEVELS[3].color} name="Serious" />
+                      <Bar dataKey="s4" stackId="a" fill={SEVERITY_LEVELS[4].color} name="Severe" />
+                      <Bar dataKey="s5" stackId="a" fill={SEVERITY_LEVELS[5].color} name="Fatal" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </>
+              )}
+              
+              {chartView === 'cumulative' && (
+                <>
+                  <h2 className="text-lg md:text-xl font-semibold mb-4 text-center">Cumulative Attacks by Severity</h2>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <AreaChart data={cumulativeData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                      <XAxis dataKey="year" stroke="#9CA3AF" />
+                      <YAxis stroke="#9CA3AF" />
+                      <Tooltip content={<SeverityTooltip />} />
+                      <Area type="monotone" dataKey="s1" stackId="1" stroke={SEVERITY_LEVELS[1].color} fill={SEVERITY_LEVELS[1].color} fillOpacity={0.8} />
+                      <Area type="monotone" dataKey="s2" stackId="1" stroke={SEVERITY_LEVELS[2].color} fill={SEVERITY_LEVELS[2].color} fillOpacity={0.8} />
+                      <Area type="monotone" dataKey="s3" stackId="1" stroke={SEVERITY_LEVELS[3].color} fill={SEVERITY_LEVELS[3].color} fillOpacity={0.8} />
+                      <Area type="monotone" dataKey="s4" stackId="1" stroke={SEVERITY_LEVELS[4].color} fill={SEVERITY_LEVELS[4].color} fillOpacity={0.8} />
+                      <Area type="monotone" dataKey="s5" stackId="1" stroke={SEVERITY_LEVELS[5].color} fill={SEVERITY_LEVELS[5].color} fillOpacity={0.8} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </>
+              )}
+              
+              {chartView === 'distribution' && (
+                <>
+                  <h2 className="text-lg md:text-xl font-semibold mb-4 text-center">Overall Severity Distribution</h2>
+                  <ResponsiveContainer width="100%" height={350}>
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={120}
+                        innerRadius={60}
+                        dataKey="value"
+                        label={({ name, value, percent }) => `${value} (${(percent * 100).toFixed(0)}%)`}
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={SEVERITY_LEVELS[entry.severity].color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ============================================================ */}
+        {/* CHART 2: PERCENTAGE COMPARISON */}
+        {/* ============================================================ */}
+        {activeChart === 'percentage' && (
+          <>
+            {/* Key Insight Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+              <div className="bg-gray-800 rounded-lg p-4 text-center">
+                <div className="text-2xl md:text-3xl font-bold text-red-500">
+                  {percentageData[percentageData.length - 1]?.severeOrWorse}%
+                </div>
+                <div className="text-xs text-gray-400">2025 Severe+Fatal</div>
+              </div>
+              <div className="bg-gray-800 rounded-lg p-4 text-center">
+                <div className="text-2xl md:text-3xl font-bold text-yellow-500">{avgSevereOrWorse}%</div>
+                <div className="text-xs text-gray-400">Avg Severe+Fatal</div>
+              </div>
+              <div className="bg-gray-800 rounded-lg p-4 text-center">
+                <div className="text-2xl md:text-3xl font-bold text-purple-500">
+                  {percentageData[percentageData.length - 1]?.p5}%
+                </div>
+                <div className="text-xs text-gray-400">2025 Fatal Rate</div>
+              </div>
+              <div className="bg-gray-800 rounded-lg p-4 text-center">
+                <div className="text-2xl md:text-3xl font-bold text-green-500">
+                  {percentageData[percentageData.length - 1]?.p1}%
+                </div>
+                <div className="text-xs text-gray-400">2025 Minor Rate</div>
+              </div>
+            </div>
+            
+            {/* Percentage Stacked Bar Chart */}
+            <div className="bg-gray-800 rounded-xl p-4 md:p-6 mb-6">
+              <h2 className="text-lg md:text-xl font-semibold mb-2 text-center">Severity Breakdown by Year (%)</h2>
+              <p className="text-center text-gray-400 text-sm mb-4">Each bar = 100% of attacks for that year</p>
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart data={percentageData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="year" stroke="#9CA3AF" />
+                  <YAxis stroke="#9CA3AF" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
+                  <Tooltip content={<PercentageTooltip />} />
+                  <Bar dataKey="p1" stackId="a" fill={SEVERITY_LEVELS[1].color} name="Minor" />
+                  <Bar dataKey="p2" stackId="a" fill={SEVERITY_LEVELS[2].color} name="Moderate" />
+                  <Bar dataKey="p3" stackId="a" fill={SEVERITY_LEVELS[3].color} name="Serious" />
+                  <Bar dataKey="p4" stackId="a" fill={SEVERITY_LEVELS[4].color} name="Severe" />
+                  <Bar dataKey="p5" stackId="a" fill={SEVERITY_LEVELS[5].color} name="Fatal" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            
+            {/* Trend Lines */}
+            <div className="bg-gray-800 rounded-xl p-4 md:p-6 mb-6">
+              <h2 className="text-lg md:text-xl font-semibold mb-4 text-center">Severity Trend Lines</h2>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={percentageData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="year" stroke="#9CA3AF" />
+                  <YAxis stroke="#9CA3AF" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
+                  <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px' }} formatter={(v) => [`${v}%`]} />
+                  <Legend />
+                  <Line type="monotone" dataKey="severeOrWorse" stroke="#ef4444" strokeWidth={3} dot={{ fill: '#ef4444', r: 4 }} name="Severe + Fatal %" />
+                  <Line type="monotone" dataKey="p5" stroke="#7c3aed" strokeWidth={2} strokeDasharray="5 5" dot={{ fill: '#7c3aed', r: 3 }} name="Fatal %" />
+                  <Line type="monotone" dataKey="p3" stroke="#f97316" strokeWidth={2} dot={{ fill: '#f97316', r: 3 }} name="Serious %" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </>
+        )}
+        
+        {/* Selected Year Details */}
+        {selectedYear && selectedYearAttacks.length > 0 && (
+          <div className="bg-gray-800 rounded-xl p-4 md:p-6 mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg md:text-xl font-semibold">{selectedYear} Attacks ({selectedYearAttacks.length})</h2>
+              <button onClick={() => setSelectedYear(null)} className="text-gray-400 hover:text-white">✕ Close</button>
+            </div>
+            <div className="max-h-96 overflow-y-auto space-y-2">
+              {selectedYearAttacks.map((attack, idx) => (
+                <div key={idx} className="flex items-start gap-3 p-2 bg-gray-700 rounded-lg">
+                  <div className="w-3 h-3 rounded-full mt-1.5 flex-shrink-0" style={{ backgroundColor: SEVERITY_LEVELS[attack.severity].color }}></div>
+                  <div className="flex-1">
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <span className="text-gray-400 text-sm">{attack.date}</span>
+                      <span className="text-xs px-2 py-0.5 rounded" style={{ backgroundColor: SEVERITY_LEVELS[attack.severity].color + '33', color: SEVERITY_LEVELS[attack.severity].color }}>
+                        {attack.type.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <p className="text-white text-sm">{attack.description}</p>
+                    <p className="text-gray-500 text-xs">{attack.location} • {attack.victim}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {/* Year-by-Year Table */}
+        <div className="bg-gray-800 rounded-xl p-4 md:p-6">
+          <h2 className="text-lg md:text-xl font-semibold mb-4">Year-by-Year Breakdown</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-700">
+                  <th className="text-left py-2 px-2">Year</th>
+                  <th className="text-center py-2 px-2">Total</th>
+                  <th className="text-center py-2 px-2" style={{ color: SEVERITY_LEVELS[5].color }}>Fatal</th>
+                  <th className="text-center py-2 px-2" style={{ color: SEVERITY_LEVELS[4].color }}>Severe</th>
+                  <th className="text-center py-2 px-2" style={{ color: SEVERITY_LEVELS[3].color }}>Serious</th>
+                  <th className="text-center py-2 px-2" style={{ color: SEVERITY_LEVELS[2].color }}>Mod.</th>
+                  <th className="text-center py-2 px-2" style={{ color: SEVERITY_LEVELS[1].color }}>Minor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {yearlyData.map(row => (
+                  <tr key={row.year} className="border-b border-gray-700 hover:bg-gray-700 cursor-pointer" onClick={() => setSelectedYear(row.year)}>
+                    <td className="py-2 px-2 font-medium">{row.year}</td>
+                    <td className="text-center py-2 px-2 text-white font-bold">{row.total}</td>
+                    <td className="text-center py-2 px-2" style={{ color: SEVERITY_LEVELS[5].color }}>{row.s5 || '-'}</td>
+                    <td className="text-center py-2 px-2" style={{ color: SEVERITY_LEVELS[4].color }}>{row.s4 || '-'}</td>
+                    <td className="text-center py-2 px-2" style={{ color: SEVERITY_LEVELS[3].color }}>{row.s3 || '-'}</td>
+                    <td className="text-center py-2 px-2" style={{ color: SEVERITY_LEVELS[2].color }}>{row.s2 || '-'}</td>
+                    <td className="text-center py-2 px-2" style={{ color: SEVERITY_LEVELS[1].color }}>{row.s1 || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <p className="text-center text-gray-500 mt-6 text-xs">
+          Note: This data represents known/reported attacks only. Many attacks go unreported. Severity is estimated based on available descriptions.
+        </p>
+      </div>
+    </div>
+  );
+}
