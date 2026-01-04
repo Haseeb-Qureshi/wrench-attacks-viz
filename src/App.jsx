@@ -71,6 +71,7 @@ export default function BitcoinAttacksApp() {
   const [chartView, setChartView] = useState('stacked');
   const [selectedYear, setSelectedYear] = useState(null);
   const [hoveredMarker, setHoveredMarker] = useState(null);
+  const [selectedLocation, setSelectedLocation] = useState(null);
   
   const stats = getStatistics();
   const { severityCounts, yearlyData } = stats;
@@ -993,6 +994,7 @@ export default function BitcoinAttacksApp() {
                         {hoveredMarker.attacks.length > 3 && (
                           <div className="text-gray-500">+{hoveredMarker.attacks.length - 3} more</div>
                         )}
+                        <div className="text-blue-400 mt-1">Click to see all</div>
                       </div>
                     )}
                   </div>
@@ -1158,6 +1160,10 @@ export default function BitcoinAttacksApp() {
                               });
                             }}
                             onMouseLeave={() => setHoveredMarker(null)}
+                            onClick={() => setSelectedLocation({
+                              ...marker,
+                              dangerColor,
+                            })}
                           />
                         </Marker>
                       );
@@ -1178,6 +1184,44 @@ export default function BitcoinAttacksApp() {
                 </div>
               </div>
             </div>
+
+            {/* Selected Location Details */}
+            {selectedLocation && selectedLocation.attacks && (
+              <div className="bg-gray-800 rounded-xl p-4 md:p-6 mb-6 animate-slide-up">
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <h2 className="text-lg md:text-xl font-semibold">{selectedLocation.city}, {selectedLocation.country}</h2>
+                    <p className="text-sm text-gray-400">
+                      <span className="text-orange-400 font-medium">{selectedLocation.count}</span> attack{selectedLocation.count > 1 ? 's' : ''} •
+                      Avg severity: <span style={{ color: selectedLocation.dangerColor }}>{selectedLocation.avgSeverity.toFixed(1)}</span>
+                    </p>
+                  </div>
+                  <button onClick={() => setSelectedLocation(null)} className="text-gray-400 hover:text-white text-xl">✕</button>
+                </div>
+                <div className="max-h-96 overflow-y-auto space-y-2">
+                  {selectedLocation.attacks
+                    .sort((a, b) => b.date.localeCompare(a.date))
+                    .map((attack, idx) => (
+                    <div key={idx} className="flex items-start gap-3 p-3 bg-gray-700 rounded-lg">
+                      <div className="w-3 h-3 rounded-full mt-1.5 flex-shrink-0" style={{ backgroundColor: SEVERITY_LEVELS[attack.severity].color }}></div>
+                      <div className="flex-1">
+                        <div className="flex flex-wrap gap-2 items-center mb-1">
+                          <span className="text-gray-400 text-sm">{attack.date}</span>
+                          <span className="text-xs px-2 py-0.5 rounded" style={{ backgroundColor: SEVERITY_LEVELS[attack.severity].color + '33', color: SEVERITY_LEVELS[attack.severity].color }}>
+                            {SEVERITY_LEVELS[attack.severity].label}
+                          </span>
+                          <span className="text-xs px-2 py-0.5 rounded bg-gray-600 text-gray-300">
+                            {attack.type.replace(/_/g, ' ')}
+                          </span>
+                        </div>
+                        <p className="text-white text-sm">{attack.description}</p>
+                        <p className="text-gray-500 text-xs mt-1">{attack.victim}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </>
         )}
 
