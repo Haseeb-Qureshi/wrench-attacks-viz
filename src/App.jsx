@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, ComposedChart, Scatter } from 'recharts';
 import { SEVERITY_LEVELS, attacks } from './data';
-import { getMonthlyMarketCap } from './marketCapData';
+import { getMonthlyMarketCap, coinbaseUsers, getYearlyMarketCap } from './marketCapData';
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -114,21 +114,19 @@ export default function BitcoinAttacksApp() {
     attacks.forEach(attack => {
       const month = attack.date.substring(0, 7); // "YYYY-MM"
       if (!monthlyAttacks[month]) {
-        monthlyAttacks[month] = { total: 0, weighted: 0, s1: 0, s2: 0, s3: 0, s4: 0, s5: 0 };
+        monthlyAttacks[month] = { total: 0, s1: 0, s2: 0, s3: 0, s4: 0, s5: 0 };
       }
       monthlyAttacks[month].total += 1;
-      monthlyAttacks[month].weighted += attack.severity; // Severity-weighted
       monthlyAttacks[month][`s${attack.severity}`] += 1;
     });
 
     // Merge monthly attacks with market cap
     const combined = monthlyMarketCap.map(mc => {
-      const attackData = monthlyAttacks[mc.month] || { total: 0, weighted: 0, s1: 0, s2: 0, s3: 0, s4: 0, s5: 0 };
+      const attackData = monthlyAttacks[mc.month] || { total: 0, s1: 0, s2: 0, s3: 0, s4: 0, s5: 0 };
       return {
         month: mc.month,
         year: mc.year,
         attacks: attackData.total,
-        weightedAttacks: attackData.weighted,
         s1: attackData.s1,
         s2: attackData.s2,
         s3: attackData.s3,
@@ -138,16 +136,43 @@ export default function BitcoinAttacksApp() {
       };
     }).filter(d => d.marketCap !== null && d.marketCap > 0);
 
-    // Run regressions
+    // Run regression
     const mcRegression = linearRegression(combined, 'marketCap', 'attacks');
-    const mcWeightedRegression = linearRegression(combined, 'marketCap', 'weightedAttacks');
 
     return {
       data: combined,
       mcRegression,
-      mcWeightedRegression,
       totalMonths: combined.length
     };
+  }, []);
+
+  // Denominator analysis - attacks per user and per $B market cap
+  const denominatorAnalysis = useMemo(() => {
+    const yearlyMC = getYearlyMarketCap();
+
+    // Aggregate attacks by year
+    const attacksByYear = {};
+    attacks.forEach(attack => {
+      const year = attack.date.substring(0, 4);
+      attacksByYear[year] = (attacksByYear[year] || 0) + 1;
+    });
+
+    // Combine all data sources
+    const combined = coinbaseUsers.map(cu => {
+      const mcData = yearlyMC.find(m => m.year === cu.year);
+      const attackCount = attacksByYear[cu.year] || 0;
+
+      return {
+        year: cu.year,
+        attacks: attackCount,
+        users: cu.users, // millions
+        marketCap: mcData ? mcData.avgMarketCap : null,
+        attacksPerMillionUsers: cu.users > 0 ? attackCount / cu.users : 0,
+        attacksPerBillionMC: mcData && mcData.avgMarketCap > 0 ? attackCount / mcData.avgMarketCap : 0,
+      };
+    }).filter(d => d.marketCap !== null && d.attacks > 0);
+
+    return combined;
   }, []);
 
   // Custom tooltips
@@ -447,37 +472,20 @@ export default function BitcoinAttacksApp() {
               </span>
             </div>
 
-            {/* Regression Results */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div className="bg-gray-800 rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-gray-400 mb-2">Market Cap → Attack Count</h3>
-                <div className="flex items-baseline gap-3">
-                  <span className="text-3xl font-bold text-orange-400">
-                    r = {marketCapCorrelation.mcRegression.correlation.toFixed(3)}
-                  </span>
-                  <span className="text-xl text-blue-400">
-                    R² = {(marketCapCorrelation.mcRegression.rSquared * 100).toFixed(1)}%
-                  </span>
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  {marketCapCorrelation.mcRegression.rSquared > 0.3 ? 'Moderate' : 'Weak'} correlation between market cap and monthly attacks
-                </p>
+            {/* Regression Result */}
+            <div className="bg-gray-800 rounded-lg p-4 mb-6">
+              <h3 className="text-sm font-semibold text-gray-400 mb-2">Market Cap → Monthly Attack Count</h3>
+              <div className="flex items-baseline gap-3">
+                <span className="text-3xl font-bold text-orange-400">
+                  r = {marketCapCorrelation.mcRegression.correlation.toFixed(3)}
+                </span>
+                <span className="text-xl text-blue-400">
+                  R² = {(marketCapCorrelation.mcRegression.rSquared * 100).toFixed(1)}%
+                </span>
               </div>
-
-              <div className="bg-gray-800 rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-gray-400 mb-2">Market Cap → Severity-Weighted</h3>
-                <div className="flex items-baseline gap-3">
-                  <span className="text-3xl font-bold text-purple-400">
-                    r = {marketCapCorrelation.mcWeightedRegression.correlation.toFixed(3)}
-                  </span>
-                  <span className="text-xl text-blue-400">
-                    R² = {(marketCapCorrelation.mcWeightedRegression.rSquared * 100).toFixed(1)}%
-                  </span>
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  Weighted by severity (Fatal=5, Severe=4, Serious=3, Moderate=2, Minor=1)
-                </p>
-              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                {marketCapCorrelation.mcRegression.rSquared > 0.3 ? 'Moderate' : 'Weak'} correlation between market cap and monthly attacks
+              </p>
             </div>
 
             {/* Dual Axis Chart */}
@@ -556,14 +564,75 @@ export default function BitcoinAttacksApp() {
               <div className="space-y-4 text-sm">
                 <div className="border-l-4 border-orange-500 pl-4">
                   <p className="text-gray-400">
-                    {`Market cap explains ${(marketCapCorrelation.mcRegression.rSquared * 100).toFixed(0)}% of monthly attack count variance. `}
-                    {marketCapCorrelation.mcWeightedRegression.rSquared > marketCapCorrelation.mcRegression.rSquared
-                      ? `Severity-weighted attacks show slightly stronger correlation (R² = ${(marketCapCorrelation.mcWeightedRegression.rSquared * 100).toFixed(0)}%), suggesting higher market caps may attract more severe attacks.`
-                      : `Severity-weighted scores show similar correlation (R² = ${(marketCapCorrelation.mcWeightedRegression.rSquared * 100).toFixed(0)}%), suggesting severity distribution is consistent regardless of market conditions.`
+                    {`Market cap explains ${(marketCapCorrelation.mcRegression.rSquared * 100).toFixed(0)}% of monthly attack count variance (r = ${marketCapCorrelation.mcRegression.correlation.toFixed(2)}). `}
+                    {marketCapCorrelation.mcRegression.rSquared > 0.3
+                      ? `This moderate correlation suggests attack frequency scales with total crypto wealth.`
+                      : `This weak-to-moderate correlation suggests other factors beyond market cap influence attack frequency.`
                     }
                   </p>
                 </div>
               </div>
+            </div>
+
+            {/* Denominator Analysis */}
+            <div className="bg-gray-800 rounded-xl p-4 md:p-6 mb-6">
+              <h2 className="text-lg md:text-xl font-semibold mb-2 text-center">Normalized Attack Rates Over Time</h2>
+              <p className="text-center text-gray-400 text-sm mb-4">
+                Attacks per million Coinbase users vs attacks per $B market cap
+              </p>
+              <ResponsiveContainer width="100%" height={350}>
+                <ComposedChart data={denominatorAnalysis}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="year" stroke="#9CA3AF" />
+                  <YAxis yAxisId="left" stroke="#22c55e" label={{ value: 'Per M Users', angle: -90, position: 'insideLeft', fill: '#22c55e', fontSize: 11 }} />
+                  <YAxis yAxisId="right" orientation="right" stroke="#a855f7" label={{ value: 'Per $B MC', angle: 90, position: 'insideRight', fill: '#a855f7', fontSize: 11 }} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px' }}
+                    formatter={(value, name) => {
+                      if (name === 'Attacks/M Users') return [value.toFixed(2), name];
+                      if (name === 'Attacks/$B MC') return [value.toFixed(3), name];
+                      return [value, name];
+                    }}
+                  />
+                  <Legend />
+                  <Line yAxisId="left" type="monotone" dataKey="attacksPerMillionUsers" stroke="#22c55e" strokeWidth={3} dot={{ fill: '#22c55e', r: 5 }} name="Attacks/M Users" />
+                  <Line yAxisId="right" type="monotone" dataKey="attacksPerBillionMC" stroke="#a855f7" strokeWidth={3} dot={{ fill: '#a855f7', r: 5 }} name="Attacks/$B MC" />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Denominator Data Table */}
+            <div className="bg-gray-800 rounded-xl p-4 md:p-6 mb-6">
+              <h2 className="text-lg md:text-xl font-semibold mb-4">Risk Rates by Year</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-700">
+                      <th className="text-left py-2 px-2">Year</th>
+                      <th className="text-right py-2 px-2">Attacks</th>
+                      <th className="text-right py-2 px-2">CB Users (M)</th>
+                      <th className="text-right py-2 px-2">Market Cap ($B)</th>
+                      <th className="text-right py-2 px-2 text-green-400">Per M Users</th>
+                      <th className="text-right py-2 px-2 text-purple-400">Per $B MC</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {denominatorAnalysis.map(row => (
+                      <tr key={row.year} className="border-b border-gray-700">
+                        <td className="py-2 px-2 font-medium">{row.year}</td>
+                        <td className="text-right py-2 px-2 text-orange-400">{row.attacks}</td>
+                        <td className="text-right py-2 px-2 text-gray-400">{row.users}</td>
+                        <td className="text-right py-2 px-2 text-blue-400">${row.marketCap}</td>
+                        <td className="text-right py-2 px-2 text-green-400">{row.attacksPerMillionUsers.toFixed(2)}</td>
+                        <td className="text-right py-2 px-2 text-purple-400">{row.attacksPerBillionMC.toFixed(3)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-gray-500 mt-4">
+                Coinbase users used as proxy for global crypto user base. Source: Coinbase filings, Business of Apps.
+              </p>
             </div>
 
             {/* Data Table - Yearly Summary */}

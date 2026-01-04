@@ -107,6 +107,23 @@ export const getYearlyMarketCap = () => {
   }));
 };
 
+// Coinbase verified users by year (in millions) - proxy for crypto user base
+// Sources: Coinbase filings, Business of Apps, WatcherGuru
+export const coinbaseUsers = [
+  { year: '2014', users: 1 },
+  { year: '2015', users: 2 },
+  { year: '2016', users: 5 },
+  { year: '2017', users: 13 },
+  { year: '2018', users: 23 },
+  { year: '2019', users: 30 },
+  { year: '2020', users: 43 },
+  { year: '2021', users: 89 },
+  { year: '2022', users: 110 },
+  { year: '2023', users: 100 },
+  { year: '2024', users: 108 },
+  { year: '2025', users: 120 },
+];
+
 // Get monthly interpolated market cap data
 export const getMonthlyMarketCap = () => {
   const monthly = [];
