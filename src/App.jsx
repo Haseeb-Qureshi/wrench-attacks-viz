@@ -477,7 +477,7 @@ export default function BitcoinAttacksApp() {
                     tickFormatter={(val) => val.substring(0, 4)}
                   />
                   <YAxis yAxisId="left" stroke="#9CA3AF" label={{ value: 'Attacks', angle: -90, position: 'insideLeft', fill: '#9CA3AF' }} />
-                  <YAxis yAxisId="right" orientation="right" stroke="#3b82f6" label={{ value: 'Market Cap ($B)', angle: 90, position: 'insideRight', fill: '#3b82f6' }} />
+                  <YAxis yAxisId="right" orientation="right" stroke="#ffffff" label={{ value: 'Market Cap ($B)', angle: 90, position: 'insideRight', fill: '#ffffff' }} />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px' }}
                     formatter={(value, name) => {
@@ -492,7 +492,7 @@ export default function BitcoinAttacksApp() {
                   <Bar yAxisId="left" dataKey="s3" stackId="a" fill={SEVERITY_LEVELS[3].color} name="Serious" />
                   <Bar yAxisId="left" dataKey="s4" stackId="a" fill={SEVERITY_LEVELS[4].color} name="Severe" />
                   <Bar yAxisId="left" dataKey="s5" stackId="a" fill={SEVERITY_LEVELS[5].color} name="Fatal" />
-                  <Line yAxisId="right" type="monotone" dataKey="marketCap" stroke="#3b82f6" strokeWidth={2} dot={false} name="Market Cap" />
+                  <Line yAxisId="right" type="monotone" dataKey="marketCap" stroke="#ffffff" strokeWidth={2} dot={false} name="Market Cap" />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -542,19 +542,19 @@ export default function BitcoinAttacksApp() {
                 <ComposedChart data={denominatorAnalysis}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                   <XAxis dataKey="year" stroke="#9CA3AF" />
-                  <YAxis yAxisId="left" stroke="#22c55e" label={{ value: 'Per M Users', angle: -90, position: 'insideLeft', fill: '#22c55e', fontSize: 11 }} />
-                  <YAxis yAxisId="right" orientation="right" stroke="#a855f7" label={{ value: 'Per $B MC', angle: 90, position: 'insideRight', fill: '#a855f7', fontSize: 11 }} />
+                  <YAxis yAxisId="left" stroke="#0052FF" label={{ value: 'Per M Users', angle: -90, position: 'insideLeft', fill: '#0052FF', fontSize: 11 }} />
+                  <YAxis yAxisId="right" orientation="right" stroke="#22c55e" label={{ value: 'Per $B MC', angle: 90, position: 'insideRight', fill: '#22c55e', fontSize: 11 }} />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px' }}
                     formatter={(value, name) => {
-                      if (name === 'Attacks/M Users') return [value.toFixed(2), name];
+                      if (name === 'Attacks / Coinbase MAUs') return [value.toFixed(2), name];
                       if (name === 'Attacks/$B MC') return [value.toFixed(3), name];
                       return [value, name];
                     }}
                   />
                   <Legend />
-                  <Line yAxisId="left" type="monotone" dataKey="attacksPerMillionUsers" stroke="#22c55e" strokeWidth={3} dot={{ fill: '#22c55e', r: 5 }} name="Attacks/M Users" />
-                  <Line yAxisId="right" type="monotone" dataKey="attacksPerBillionMC" stroke="#a855f7" strokeWidth={3} dot={{ fill: '#a855f7', r: 5 }} name="Attacks/$B MC" />
+                  <Line yAxisId="left" type="monotone" dataKey="attacksPerMillionUsers" stroke="#0052FF" strokeWidth={3} dot={{ fill: '#0052FF', r: 5 }} name="Attacks / Coinbase MAUs" />
+                  <Line yAxisId="right" type="monotone" dataKey="attacksPerBillionMC" stroke="#22c55e" strokeWidth={3} dot={{ fill: '#22c55e', r: 5 }} name="Attacks/$B MC" />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -570,8 +570,8 @@ export default function BitcoinAttacksApp() {
                       <th className="text-right py-2 px-2">Attacks</th>
                       <th className="text-right py-2 px-2">CB Users (M)</th>
                       <th className="text-right py-2 px-2">Market Cap ($B)</th>
-                      <th className="text-right py-2 px-2 text-green-400">Per M Users</th>
-                      <th className="text-right py-2 px-2 text-purple-400">Per $B MC</th>
+                      <th className="text-right py-2 px-2 text-blue-500">Per M Users</th>
+                      <th className="text-right py-2 px-2 text-green-400">Per $B MC</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -581,8 +581,8 @@ export default function BitcoinAttacksApp() {
                         <td className="text-right py-2 px-2 text-orange-400">{row.attacks}</td>
                         <td className="text-right py-2 px-2 text-gray-400">{row.users}</td>
                         <td className="text-right py-2 px-2 text-blue-400">${row.marketCap}</td>
-                        <td className="text-right py-2 px-2 text-green-400">{row.attacksPerMillionUsers.toFixed(2)}</td>
-                        <td className="text-right py-2 px-2 text-purple-400">{row.attacksPerBillionMC.toFixed(3)}</td>
+                        <td className="text-right py-2 px-2 text-blue-500">{row.attacksPerMillionUsers.toFixed(2)}</td>
+                        <td className="text-right py-2 px-2 text-green-400">{row.attacksPerBillionMC.toFixed(3)}</td>
                       </tr>
                     ))}
                   </tbody>
