@@ -238,24 +238,6 @@ export default function BitcoinAttacksApp() {
           Data: <a href="https://github.com/jlopp/physical-bitcoin-attacks" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">jlopp/physical-bitcoin-attacks</a> • {attacks.length} total attacks • <a href="https://github.com/Haseeb-Qureshi/wrench-attacks-viz" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">View source</a>
         </p>
         
-        {/* Severity Legend with Descriptions */}
-        <div className="bg-gray-800 rounded-xl p-4 mb-6">
-          <h3 className="text-sm font-semibold mb-3 text-gray-300">Severity Classification</h3>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-            {[5, 4, 3, 2, 1].map(sev => (
-              <div key={sev} className="flex gap-2">
-                <div className="w-3 h-3 rounded mt-[8px] flex-shrink-0" style={{ backgroundColor: SEVERITY_LEVELS[sev].color }}></div>
-                <div>
-                  <span className="text-sm font-medium" style={{ color: SEVERITY_LEVELS[sev].color }}>
-                    {SEVERITY_LEVELS[sev].label}
-                  </span>
-                  <p className="text-xs text-gray-500">{SEVERITY_LEVELS[sev].description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        
         {/* Chart Selector */}
         <div className="flex justify-center gap-2 mb-6">
           <button
@@ -284,15 +266,21 @@ export default function BitcoinAttacksApp() {
           </button>
         </div>
         
-        {/* Stats Cards */}
+        {/* Stats Cards with Severity Legend */}
         <div className="grid grid-cols-5 gap-2 md:gap-4 mb-6">
-          {[5, 4, 3, 2, 1].map(sev => (
-            <div key={sev} className="bg-gray-800 rounded-lg p-2 md:p-4 text-center">
-              <div className="text-xl md:text-3xl font-bold" style={{ color: SEVERITY_LEVELS[sev].color }}>
+          {[1, 2, 3, 4, 5].map(sev => (
+            <div key={sev} className="bg-gray-800 rounded-lg p-2 md:p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-3 h-3 rounded flex-shrink-0" style={{ backgroundColor: SEVERITY_LEVELS[sev].color }}></div>
+                <span className="text-sm font-medium" style={{ color: SEVERITY_LEVELS[sev].color }}>
+                  {SEVERITY_LEVELS[sev].label}
+                </span>
+              </div>
+              <div className="text-xl md:text-3xl font-bold mb-1" style={{ color: SEVERITY_LEVELS[sev].color }}>
                 {severityCounts[sev]}
               </div>
-              <div className="text-xs text-gray-400 hidden md:block">{SEVERITY_LEVELS[sev].label}</div>
-              <div className="text-xs text-gray-500">{((severityCounts[sev] / attacks.length) * 100).toFixed(0)}%</div>
+              <div className="text-xs text-gray-500 mb-2">{((severityCounts[sev] / attacks.length) * 100).toFixed(0)}%</div>
+              <p className="text-xs text-gray-500 hidden md:block">{SEVERITY_LEVELS[sev].description}</p>
             </div>
           ))}
         </div>
