@@ -244,7 +244,7 @@ export default function BitcoinAttacksApp() {
           <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
             {[1, 2, 3, 4, 5].map(sev => (
               <div key={sev} className="flex gap-2">
-                <div className="w-3 h-3 rounded mt-[15px] flex-shrink-0" style={{ backgroundColor: SEVERITY_LEVELS[sev].color }}></div>
+                <div className="w-3 h-3 rounded mt-[5px] flex-shrink-0" style={{ backgroundColor: SEVERITY_LEVELS[sev].color }}></div>
                 <div>
                   <span className="text-sm font-medium" style={{ color: SEVERITY_LEVELS[sev].color }}>
                     {SEVERITY_LEVELS[sev].label}
