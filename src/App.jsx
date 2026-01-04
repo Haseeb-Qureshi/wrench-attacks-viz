@@ -1218,7 +1218,20 @@ export default function BitcoinAttacksApp() {
                           </span>
                         </div>
                         <p className="text-white text-sm">{attack.description}</p>
-                        <p className="text-gray-500 text-xs mt-1">{attack.victim}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-gray-500 text-xs">{attack.victim}</span>
+                          {attack.url && (
+                            <a
+                              href={attack.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-400 hover:text-blue-300 text-xs"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              Source →
+                            </a>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1247,14 +1260,26 @@ export default function BitcoinAttacksApp() {
                       </span>
                     </div>
                     <p className="text-white text-sm">{attack.description}</p>
-                    <p className="text-gray-500 text-xs">{attack.location} • {attack.victim}</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-500 text-xs">{attack.location} • {attack.victim}</span>
+                      {attack.url && (
+                        <a
+                          href={attack.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-400 hover:text-blue-300 text-xs"
+                        >
+                          Source →
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
         )}
-        
+
         {/* Year-by-Year Table */}
         <div className="bg-gray-800 rounded-xl p-4 md:p-6">
           <h2 className="text-lg md:text-xl font-semibold mb-4">Year-by-Year Breakdown</h2>
