@@ -96,8 +96,6 @@ export default function BitcoinAttacksApp() {
     ? attacks.filter(a => a.date.startsWith(selectedYear)).sort((a, b) => b.severity - a.severity)
     : [];
 
-  const avgSevereOrWorse = Math.round(((severityCounts[4] + severityCounts[5]) / attacks.length) * 100);
-
   // Market cap correlation data (monthly)
   const marketCapCorrelation = useMemo(() => {
     const monthlyMarketCap = getMonthlyMarketCap();
@@ -358,32 +356,6 @@ export default function BitcoinAttacksApp() {
         {/* ============================================================ */}
         {activeChart === 'percentage' && (
           <>
-            {/* Key Insight Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-              <div className="bg-gray-800 rounded-lg p-4 text-center">
-                <div className="text-2xl md:text-3xl font-bold text-red-500">
-                  {percentageData[percentageData.length - 1]?.severeOrWorse}%
-                </div>
-                <div className="text-xs text-gray-400">2025 Severe+Fatal</div>
-              </div>
-              <div className="bg-gray-800 rounded-lg p-4 text-center">
-                <div className="text-2xl md:text-3xl font-bold text-yellow-500">{avgSevereOrWorse}%</div>
-                <div className="text-xs text-gray-400">Avg Severe+Fatal</div>
-              </div>
-              <div className="bg-gray-800 rounded-lg p-4 text-center">
-                <div className="text-2xl md:text-3xl font-bold text-purple-500">
-                  {percentageData[percentageData.length - 1]?.p5}%
-                </div>
-                <div className="text-xs text-gray-400">2025 Fatal Rate</div>
-              </div>
-              <div className="bg-gray-800 rounded-lg p-4 text-center">
-                <div className="text-2xl md:text-3xl font-bold text-green-500">
-                  {percentageData[percentageData.length - 1]?.p1}%
-                </div>
-                <div className="text-xs text-gray-400">2025 Minor Rate</div>
-              </div>
-            </div>
-            
             {/* Percentage Stacked Bar Chart */}
             <div className="bg-gray-800 rounded-xl p-4 md:p-6 mb-6">
               <h2 className="text-lg md:text-xl font-semibold mb-2 text-center">Severity Breakdown by Year (%)</h2>
