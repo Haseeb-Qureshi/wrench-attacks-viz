@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell } from 'recharts';
+import React, { useState, useMemo } from 'react';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, ComposedChart, Scatter } from 'recharts';
 import { SEVERITY_LEVELS, attacks } from './data';
+import { getMonthlyMarketCap } from './marketCapData';
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -27,6 +28,35 @@ const getStatistics = () => {
     severityCounts,
     yearlyData: Object.values(yearlyData).sort((a, b) => a.year.localeCompare(b.year))
   };
+};
+
+// Simple linear regression
+const linearRegression = (data, xKey, yKey) => {
+  const n = data.length;
+  if (n < 2) return { slope: 0, intercept: 0, rSquared: 0, correlation: 0 };
+
+  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
+
+  data.forEach(point => {
+    const x = point[xKey];
+    const y = point[yKey];
+    sumX += x;
+    sumY += y;
+    sumXY += x * y;
+    sumX2 += x * x;
+    sumY2 += y * y;
+  });
+
+  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+  const intercept = (sumY - slope * sumX) / n;
+
+  // Correlation coefficient (Pearson's r)
+  const numerator = n * sumXY - sumX * sumY;
+  const denominator = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+  const correlation = denominator !== 0 ? numerator / denominator : 0;
+  const rSquared = correlation * correlation;
+
+  return { slope, intercept, rSquared, correlation };
 };
 
 // ============================================================================
@@ -74,6 +104,51 @@ export default function BitcoinAttacksApp() {
     : [];
 
   const avgSevereOrWorse = Math.round(((severityCounts[4] + severityCounts[5]) / attacks.length) * 100);
+
+  // Market cap correlation data (monthly)
+  const marketCapCorrelation = useMemo(() => {
+    const monthlyMarketCap = getMonthlyMarketCap();
+
+    // Calculate monthly attack counts with severity breakdown
+    const monthlyAttacks = {};
+    attacks.forEach(attack => {
+      const month = attack.date.substring(0, 7); // "YYYY-MM"
+      if (!monthlyAttacks[month]) {
+        monthlyAttacks[month] = { total: 0, weighted: 0, s1: 0, s2: 0, s3: 0, s4: 0, s5: 0 };
+      }
+      monthlyAttacks[month].total += 1;
+      monthlyAttacks[month].weighted += attack.severity; // Severity-weighted
+      monthlyAttacks[month][`s${attack.severity}`] += 1;
+    });
+
+    // Merge monthly attacks with market cap
+    const combined = monthlyMarketCap.map(mc => {
+      const attackData = monthlyAttacks[mc.month] || { total: 0, weighted: 0, s1: 0, s2: 0, s3: 0, s4: 0, s5: 0 };
+      return {
+        month: mc.month,
+        year: mc.year,
+        attacks: attackData.total,
+        weightedAttacks: attackData.weighted,
+        s1: attackData.s1,
+        s2: attackData.s2,
+        s3: attackData.s3,
+        s4: attackData.s4,
+        s5: attackData.s5,
+        marketCap: mc.marketCap,
+      };
+    }).filter(d => d.marketCap !== null && d.marketCap > 0);
+
+    // Run regressions
+    const mcRegression = linearRegression(combined, 'marketCap', 'attacks');
+    const mcWeightedRegression = linearRegression(combined, 'marketCap', 'weightedAttacks');
+
+    return {
+      data: combined,
+      mcRegression,
+      mcWeightedRegression,
+      totalMonths: combined.length
+    };
+  }, []);
 
   // Custom tooltips
   const SeverityTooltip = ({ active, payload, label }) => {
@@ -149,9 +224,9 @@ export default function BitcoinAttacksApp() {
         <div className="bg-gray-800 rounded-xl p-4 mb-6">
           <h3 className="text-sm font-semibold mb-3 text-gray-300">Severity Classification</h3>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-            {[5, 4, 3, 2, 1].map(sev => (
+            {[1, 2, 3, 4, 5].map(sev => (
               <div key={sev} className="flex items-start gap-2">
-                <div className="w-3 h-3 rounded mt-1 flex-shrink-0" style={{ backgroundColor: SEVERITY_LEVELS[sev].color }}></div>
+                <div className="w-3 h-3 rounded mt-0.5 flex-shrink-0" style={{ backgroundColor: SEVERITY_LEVELS[sev].color }}></div>
                 <div>
                   <span className="text-sm font-medium" style={{ color: SEVERITY_LEVELS[sev].color }}>
                     {SEVERITY_LEVELS[sev].label}
@@ -180,6 +255,14 @@ export default function BitcoinAttacksApp() {
             }`}
           >
             Percentage Comparison
+          </button>
+          <button
+            onClick={() => setActiveChart('marketcap')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeChart === 'marketcap' ? 'bg-orange-500 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+          >
+            Market Cap Analysis
           </button>
         </div>
         
@@ -348,6 +431,183 @@ export default function BitcoinAttacksApp() {
                   <Line type="monotone" dataKey="p3" stroke="#f97316" strokeWidth={2} dot={{ fill: '#f97316', r: 3 }} name="Serious %" />
                 </LineChart>
               </ResponsiveContainer>
+            </div>
+          </>
+        )}
+
+        {/* ============================================================ */}
+        {/* CHART 3: MARKET CAP CORRELATION */}
+        {/* ============================================================ */}
+        {activeChart === 'marketcap' && (
+          <>
+            {/* Sample Size Note */}
+            <div className="bg-gray-700 rounded-lg p-3 mb-6 text-center">
+              <span className="text-gray-300 text-sm">
+                Monthly analysis: <span className="text-orange-400 font-bold">{marketCapCorrelation.totalMonths}</span> data points
+              </span>
+            </div>
+
+            {/* Regression Results */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div className="bg-gray-800 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-400 mb-2">Market Cap → Attack Count</h3>
+                <div className="flex items-baseline gap-3">
+                  <span className="text-3xl font-bold text-orange-400">
+                    r = {marketCapCorrelation.mcRegression.correlation.toFixed(3)}
+                  </span>
+                  <span className="text-xl text-blue-400">
+                    R² = {(marketCapCorrelation.mcRegression.rSquared * 100).toFixed(1)}%
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  {marketCapCorrelation.mcRegression.rSquared > 0.3 ? 'Moderate' : 'Weak'} correlation between market cap and monthly attacks
+                </p>
+              </div>
+
+              <div className="bg-gray-800 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-400 mb-2">Market Cap → Severity-Weighted</h3>
+                <div className="flex items-baseline gap-3">
+                  <span className="text-3xl font-bold text-purple-400">
+                    r = {marketCapCorrelation.mcWeightedRegression.correlation.toFixed(3)}
+                  </span>
+                  <span className="text-xl text-blue-400">
+                    R² = {(marketCapCorrelation.mcWeightedRegression.rSquared * 100).toFixed(1)}%
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Weighted by severity (Fatal=5, Severe=4, Serious=3, Moderate=2, Minor=1)
+                </p>
+              </div>
+            </div>
+
+            {/* Dual Axis Chart */}
+            <div className="bg-gray-800 rounded-xl p-4 md:p-6 mb-6">
+              <h2 className="text-lg md:text-xl font-semibold mb-2 text-center">Monthly Market Cap vs Attack Frequency</h2>
+              <p className="text-center text-gray-400 text-sm mb-4">Stacked severity bars vs market cap (line)</p>
+              <ResponsiveContainer width="100%" height={400}>
+                <ComposedChart data={marketCapCorrelation.data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis
+                    dataKey="month"
+                    stroke="#9CA3AF"
+                    tick={{ fontSize: 10 }}
+                    interval={11}
+                    tickFormatter={(val) => val.substring(0, 4)}
+                  />
+                  <YAxis yAxisId="left" stroke="#9CA3AF" label={{ value: 'Attacks', angle: -90, position: 'insideLeft', fill: '#9CA3AF' }} />
+                  <YAxis yAxisId="right" orientation="right" stroke="#3b82f6" label={{ value: 'Market Cap ($B)', angle: 90, position: 'insideRight', fill: '#3b82f6' }} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px' }}
+                    formatter={(value, name) => {
+                      if (name === 'Market Cap') return [`$${value}B`, name];
+                      return [value, name];
+                    }}
+                    labelFormatter={(label) => label}
+                  />
+                  <Legend />
+                  <Bar yAxisId="left" dataKey="s1" stackId="a" fill={SEVERITY_LEVELS[1].color} name="Minor" />
+                  <Bar yAxisId="left" dataKey="s2" stackId="a" fill={SEVERITY_LEVELS[2].color} name="Moderate" />
+                  <Bar yAxisId="left" dataKey="s3" stackId="a" fill={SEVERITY_LEVELS[3].color} name="Serious" />
+                  <Bar yAxisId="left" dataKey="s4" stackId="a" fill={SEVERITY_LEVELS[4].color} name="Severe" />
+                  <Bar yAxisId="left" dataKey="s5" stackId="a" fill={SEVERITY_LEVELS[5].color} name="Fatal" />
+                  <Line yAxisId="right" type="monotone" dataKey="marketCap" stroke="#3b82f6" strokeWidth={2} dot={false} name="Market Cap" />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Scatter Plot */}
+            <div className="bg-gray-800 rounded-xl p-4 md:p-6 mb-6">
+              <h2 className="text-lg md:text-xl font-semibold mb-2 text-center">Correlation Scatter Plot</h2>
+              <p className="text-center text-gray-400 text-sm mb-4">Each point is a month ({marketCapCorrelation.totalMonths} data points)</p>
+              <ResponsiveContainer width="100%" height={350}>
+                <ComposedChart data={marketCapCorrelation.data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis
+                    dataKey="marketCap"
+                    type="number"
+                    stroke="#9CA3AF"
+                    label={{ value: 'Market Cap ($B)', position: 'insideBottom', offset: -5, fill: '#9CA3AF' }}
+                  />
+                  <YAxis
+                    dataKey="attacks"
+                    type="number"
+                    stroke="#9CA3AF"
+                    label={{ value: 'Attacks/Month', angle: -90, position: 'insideLeft', fill: '#9CA3AF' }}
+                  />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px' }}
+                    formatter={(value, name) => {
+                      if (name === 'marketCap') return [`$${value}B`, 'Market Cap'];
+                      return [value, name];
+                    }}
+                    labelFormatter={(label) => {
+                      const point = marketCapCorrelation.data.find(d => d.marketCap === label);
+                      return point ? point.month : label;
+                    }}
+                  />
+                  <Scatter dataKey="attacks" fill="#f97316" name="Month" />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Analysis Summary */}
+            <div className="bg-gray-800 rounded-xl p-4 md:p-6 mb-6">
+              <h2 className="text-lg md:text-xl font-semibold mb-4">Summary</h2>
+              <div className="space-y-4 text-sm">
+                <div className="border-l-4 border-orange-500 pl-4">
+                  <p className="text-gray-400">
+                    {`Market cap explains ${(marketCapCorrelation.mcRegression.rSquared * 100).toFixed(0)}% of monthly attack count variance. `}
+                    {marketCapCorrelation.mcWeightedRegression.rSquared > marketCapCorrelation.mcRegression.rSquared
+                      ? `Severity-weighted attacks show slightly stronger correlation (R² = ${(marketCapCorrelation.mcWeightedRegression.rSquared * 100).toFixed(0)}%), suggesting higher market caps may attract more severe attacks.`
+                      : `Severity-weighted scores show similar correlation (R² = ${(marketCapCorrelation.mcWeightedRegression.rSquared * 100).toFixed(0)}%), suggesting severity distribution is consistent regardless of market conditions.`
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Data Table - Yearly Summary */}
+            <div className="bg-gray-800 rounded-xl p-4 md:p-6 mb-6">
+              <h2 className="text-lg md:text-xl font-semibold mb-2">Yearly Summary</h2>
+              <p className="text-gray-400 text-sm mb-4">Aggregated from monthly data for readability</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-700">
+                      <th className="text-left py-2 px-2">Year</th>
+                      <th className="text-right py-2 px-2">Attacks</th>
+                      <th className="text-right py-2 px-2">Avg Market Cap</th>
+                      <th className="text-right py-2 px-2">Attacks/Month</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      // Aggregate monthly data to yearly
+                      const yearly = {};
+                      marketCapCorrelation.data.forEach(d => {
+                        if (!yearly[d.year]) {
+                          yearly[d.year] = { attacks: 0, marketCapSum: 0, months: 0 };
+                        }
+                        yearly[d.year].attacks += d.attacks;
+                        yearly[d.year].marketCapSum += d.marketCap;
+                        yearly[d.year].months += 1;
+                      });
+                      return Object.entries(yearly).map(([year, data]) => (
+                        <tr key={year} className="border-b border-gray-700">
+                          <td className="py-2 px-2 font-medium">{year}</td>
+                          <td className="text-right py-2 px-2 text-orange-400">{data.attacks}</td>
+                          <td className="text-right py-2 px-2 text-blue-400">
+                            ${Math.round(data.marketCapSum / data.months)}B
+                          </td>
+                          <td className="text-right py-2 px-2 text-gray-400">
+                            {(data.attacks / data.months).toFixed(1)}
+                          </td>
+                        </tr>
+                      ));
+                    })()}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </>
         )}
